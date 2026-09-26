@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kawther | creates</title>
+<meta name="description" content="A private wellness journal to track your habits, your weight and your consistency.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#050605">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+/* Apply the saved theme before first paint (no dark/light flash). */
+try{var t=localStorage.getItem('kc_theme')||'dark';if(t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}
+</script>
+<style>
+/* Critical splash styles: inline so the branded screen paints before any JS/CSS bundle loads. */
+html{background:#060706;}
+:root[data-theme="light"]{background:#FAF8F4;}
+#splash{position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:clamp(14px,3.2vh,22px); padding:24px; background:radial-gradient(ellipse 70% 50% at 50% 42%, rgba(34,197,139,.13), transparent 70%), #060706; color:#F3F5F3; transition:opacity .4s ease, visibility .4s; }
+#splash:not(.out) ~ .app, #splash:not(.out) ~ .bottomnav{visibility:hidden;}
+#splash.out{opacity:0; visibility:hidden; pointer-events:none;}
+#splash .sp-logo{width:clamp(64px,min(22vw,13vh),96px); aspect-ratio:1; border-radius:22%; box-shadow:0 8px 36px rgba(34,197,139,.25); animation:spIn .6s cubic-bezier(.16,.84,.44,1) both;}
+#splash .sp-logo img{width:100%; height:100%; display:block; border-radius:22%;}
+#splash .sp-word{font:600 clamp(11px,3vw,13px)/1 'Plus Jakarta Sans',system-ui,sans-serif; letter-spacing:.28em; text-indent:.28em; color:#8A9490; animation:spIn .6s .1s cubic-bezier(.16,.84,.44,1) both;}
+#splash .sp-word b{color:#22C58B; font-weight:600;}
+#splash .sp-bar{width:clamp(56px,16vw,84px); height:2px; border-radius:2px; background:rgba(243,245,243,.09); overflow:hidden; position:relative; animation:spIn .6s .2s both;}
+#splash .sp-bar::after{content:""; position:absolute; inset:0; width:45%; border-radius:2px; background:linear-gradient(90deg,transparent,#22C58B,transparent); animation:spSlide 1.3s ease-in-out infinite;}
+.sr-only{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
+@keyframes spIn{from{opacity:0; transform:translateY(8px) scale(.97);} to{opacity:1; transform:none;}}
+@keyframes spSlide{from{transform:translateX(-110%);} to{transform:translateX(240%);}}
+@media(prefers-reduced-motion:reduce){#splash,#splash .sp-logo,#splash .sp-word,#splash .sp-bar{animation:none !important; transition:opacity .01s !important;} #splash .sp-bar::after{animation:none; width:100%; opacity:.5;}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="flameOut" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FF3B1F"/><stop offset=".55" stop-color="#FF7A00"/><stop offset="1" stop-color="#FFB800"/></linearGradient><linearGradient id="flameIn" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFC21A"/><stop offset="1" stop-color="#FFF07A"/></linearGradient></defs></svg>
+<div id="splash" role="status" aria-live="polite">
+  <div class="sp-logo"><img src="/logo-white.png" alt="" width="96" height="96" decoding="async"></div>
+  <div class="sp-word">KAWTHER <b>|</b> CREATES</div>
+  <div class="sp-bar" aria-hidden="true"></div>
+  <span class="sr-only">Loading Kawther | creates</span>
+</div>
+<div class="app" id="app">
+
+<!-- LANDING -->
+<section class="screen" id="s-landing">
+  <div class="hero-landing">
+    <div class="klogo klogo--xl" role="img" aria-label="Kawther creates"><img class="kw" src="/logo-white.png" alt="" decoding="async"><img class="kb" src="/logo-black.png" alt="" decoding="async"></div>
+    <h1>Become who you're becoming.</h1>
+    <p>A private wellness journal to track your habits, your weight and your consistency — and watch yourself transform.</p>
+    <button class="btn" data-action="go" data-target="s-signup">Create account</button>
+    <div style="height:10px"></div>
+    <button class="btn secondary" data-action="go" data-target="s-login">I already have an account</button>
+  </div>
+</section>
+
+<!-- CONNECTION / CONFIG ERROR -->
+<section class="screen" id="s-error">
+  <div class="hero-landing">
+    <div class="klogo klogo--md" role="img" aria-label="Kawther creates"><img class="kw" src="/logo-white.png" alt="" decoding="async"><img class="kb" src="/logo-black.png" alt="" decoding="async"></div>
+    <h2 class="serif">We couldn't load your journal</h2>
+    <p id="err-msg">Something went wrong. Please try again.</p>
+    <button class="btn" data-action="reload">Try again</button>
+  </div>
+</section>
+
+<!-- SIGNUP -->
+<section class="screen" id="s-signup">
+  <div class="klogo klogo--md" role="img" aria-label="Kawther creates"><img class="kw" src="/logo-white.png" alt="" decoding="async"><img class="kb" src="/logo-black.png" alt="" decoding="async"></div>
+  <h2 class="serif">Create your account</h2>
+  <p style="color:var(--sub); font-size:13.5px; margin-top:-8px;">Your journey, just for you.</p>
+  <div class="field"><label for="su-name">Full name</label><input id="su-name" placeholder="Your name" autocomplete="name"><div class="err" id="e-su-name">Please enter your name.</div></div>
+  <div class="field"><label for="su-email">Email</label><input id="su-email" type="email" placeholder="you@email.com" autocomplete="email"><div class="err" id="e-su-email">Please enter a valid email.</div></div>
+  <div class="field"><label for="su-pass">Password</label><div class="pw-wrap"><input id="su-pass" type="password" placeholder="At least 8 characters" autocomplete="new-password"><button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Show password" aria-pressed="false"><svg class="i-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="i-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button></div><div class="err" id="e-su-pass">Password must contain at least 8 characters.</div></div>
+  <div class="field"><label for="su-pass2">Confirm password</label><div class="pw-wrap"><input id="su-pass2" type="password" placeholder="Re-enter password" autocomplete="new-password"><button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Show password" aria-pressed="false"><svg class="i-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="i-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button></div><div class="err" id="e-su-pass2">Passwords don't match.</div></div>
+  <button class="btn" data-action="signup">Create account</button>
+  <div class="linkrow">Already have an account? <a role="button" tabindex="0" data-action="go" data-target="s-login">Log in</a></div>
+</section>
+
+<!-- LOGIN -->
+<section class="screen" id="s-login">
+  <div class="klogo klogo--md" role="img" aria-label="Kawther creates"><img class="kw" src="/logo-white.png" alt="" decoding="async"><img class="kb" src="/logo-black.png" alt="" decoding="async"></div>
+  <h2 class="serif">Welcome back</h2>
+  <div class="field"><label for="li-email">Email</label><input id="li-email" type="email" placeholder="you@email.com" autocomplete="email"></div>
+  <div class="field"><label for="li-pass">Password</label><div class="pw-wrap"><input id="li-pass" type="password" placeholder="Your password" autocomplete="current-password"><button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Show password" aria-pressed="false"><svg class="i-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="i-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button></div></div>
+  <div class="err" id="e-login">Email or password is incorrect.</div>
+  <div style="height:6px"></div>
+  <button class="btn" data-action="login">Log in</button>
+  <div class="linkrow">New here? <a role="button" tabindex="0" data-action="go" data-target="s-signup">Create account</a></div>
+</section>
+
+<!-- ONBOARDING -->
+<section class="screen" id="s-ob1">
+  <div class="stepnum">01 / 03</div>
+  <div class="step-track"><i class="on"></i><i></i><i></i></div>
+  <h1 class="serif" style="font-size:26px;">Your journey starts here.</h1>
+  <p style="color:var(--sub); font-size:14.5px; line-height:1.6;">Build consistency. Track your progress. Become the version of yourself you're working toward.</p>
+  <div style="height:20px"></div>
+  <button class="btn" data-action="go" data-target="s-ob2">Let's begin</button>
+</section>
+
+<section class="screen" id="s-ob2">
+  <div class="stepnum">02 / 03</div>
+  <div class="step-track"><i class="on"></i><i class="on"></i><i></i></div>
+  <h2 class="serif">Where are you starting?</h2>
+  <div class="field"><label for="ob-start">Current weight (kg)</label><input id="ob-start" type="number" step="0.1" placeholder="e.g. 70.0"><div class="err" id="e-ob-start">Please enter a valid weight.</div></div>
+  <button class="btn" data-action="ob-step2">Continue</button>
+</section>
+
+<section class="screen" id="s-ob3">
+  <div class="stepnum">02 / 03</div>
+  <div class="step-track"><i class="on"></i><i class="on"></i><i></i></div>
+  <h2 class="serif">Where do you want to go?</h2>
+  <div class="field"><label for="ob-goal">Goal weight (kg)</label><input id="ob-goal" type="number" step="0.1" placeholder="e.g. 62.0"><div class="err" id="e-ob-goal">Please enter a valid weight.</div></div>
+  <button class="btn" data-action="ob-step3">Continue</button>
+</section>
+
+<section class="screen" id="s-ob4">
+  <div class="stepnum">03 / 03</div>
+  <div class="step-track"><i class="on"></i><i class="on"></i><i class="on"></i></div>
+  <h2 class="serif">How long is your journey?</h2>
+  <div class="dur-group" role="group" aria-label="Journey length">
+    <button type="button" class="dur-card" data-d="30" aria-pressed="false" data-action="pick-dur"><b>30 days</b><span>A focused start</span></button>
+    <button type="button" class="dur-card" data-d="60" aria-pressed="false" data-action="pick-dur"><b>60 days</b><span>Build consistency</span></button>
+    <button type="button" class="dur-card on" data-d="90" aria-pressed="true" data-action="pick-dur"><b>90 days</b><span>A complete transformation</span></button>
+    <div class="dur-card dur-custom" id="dur-custom">
+      <button type="button" class="dur-custom-head" data-d="custom" aria-pressed="false" aria-controls="dur-custom-body" data-action="pick-dur"><b>Custom</b><span>Choose your own duration</span></button>
+      <div class="dur-custom-body" id="dur-custom-body" hidden>
+        <label for="ob-dur" class="dur-label">Custom journey</label>
+        <div class="dur-stepper">
+          <button type="button" class="dur-step" data-action="dur-step" data-n="-1" aria-label="One day fewer">&minus;</button>
+          <input id="ob-dur" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="3" placeholder="45" aria-describedby="e-ob-dur" data-input="ob-dur">
+          <span class="dur-unit">days</span>
+          <button type="button" class="dur-step" data-action="dur-step" data-n="1" aria-label="One day more">+</button>
+        </div>
+        <div class="err" id="e-ob-dur" role="alert" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+  <button class="btn" data-action="finish-onboarding">Start my journey</button>
+</section>
+
+<section class="screen" id="s-success">
+  <div class="hero-landing" style="padding-top:12vh;">
+    <div style="width:64px;height:64px;border-radius:50%;background:var(--emerald-tint);display:flex;align-items:center;justify-content:center;margin:0 auto;box-shadow:0 0 24px var(--emerald-glow);">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h1 style="font-size:26px;">Your journey is ready.</h1>
+    <div class="card" style="text-align:center; margin:26px 0;">
+      <div class="serif" style="font-size:14px; color:var(--sub); letter-spacing:.06em;" id="suc-days">—</div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:14px; margin:12px 0;">
+        <b class="serif" style="font-size:24px;" id="suc-start">—</b>
+        <span style="color:var(--emerald); font-size:18px;">→</span>
+        <b class="serif" style="font-size:24px;" id="suc-goal">—</b>
+      </div>
+      <p style="margin:0; color:var(--sub); font-size:13.5px;">Let's make consistency your superpower.</p>
+    </div>
+    <button class="btn" data-action="enter-home">Enter my journey</button>
+  </div>
+</section>
+
+<!-- HOME -->
+<section class="screen" id="s-home">
+  <div class="brandtag"><div class="klogo klogo--sm" role="img" aria-label="Kawther creates"><img class="kw" src="/logo-white.png" alt="" decoding="async"><img class="kb" src="/logo-black.png" alt="" decoding="async"></div><em>KAWTHER <span>|</span> CREATES</em></div>
+  <div class="hero-top">
+    <div><div class="greet" id="h-greet">Hello</div><div class="name" id="h-name">&nbsp;</div></div>
+    <button class="iconbtn profilebtn" data-action="open-profile" aria-label="Open profile and settings"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="4"/></svg></button>
+  </div>
+  <div class="hero-card">
+    <div class="hero-head">
+      <div class="hero-day" id="h-daylabel">&nbsp;</div>
+      <div class="streak-chip" id="h-streak-chip" data-state="none" role="status"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path class="fl-out" d="M12 2s1 3.2-1.2 5.6C8.6 10 6 12 6 15.5a6 6 0 0 0 12 0c0-2.2-1-3.8-2.2-5.2-.3 1.4-1 2.2-1.9 2.6.4-3.6-.6-7.6-1.9-10.9z"/><path class="fl-in" d="M12 21a3.2 3.2 0 0 0 3.2-3.2c0-1.8-1.4-2.6-2.2-4-.4 1-1 1.4-1.6 2-.9.8-2.6 1.6-2.6 4A3.2 3.2 0 0 0 12 21z"/></svg><span id="h-streak">0 day streak</span></div>
+    </div>
+    <div class="ring-wrap">
+      <div class="ring">
+        <svg width="96" height="96" viewBox="0 0 96 96">
+          <circle cx="48" cy="48" r="42" stroke="var(--line)" stroke-width="8" fill="none"/>
+          <circle id="h-ringfg" cx="48" cy="48" r="42" stroke="var(--emerald)" stroke-width="8" fill="none" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264"/>
+        </svg>
+        <div class="num"><b id="h-daynum">1</b><small>DAY</small></div>
+      </div>
+      <div class="hero-stats">
+        <div class="weight" id="h-weight">—</div>
+        <div class="delta" id="h-delta">Just getting started</div>
+        <div class="hero-goaldate" id="h-goaldate"></div>
+      </div>
+    </div>
+    <div class="goalbar">
+      <div class="lbl"><span>Goal: <span id="h-goal">—</span></span><span id="h-pct">0%</span></div>
+      <div class="track"><i id="h-track" style="width:0%"></i></div>
+    </div>
+    <div class="motiv" id="h-motiv">Your journey starts today.</div>
+    <div class="renew-banner" id="h-renew" hidden>
+      <p id="h-renew-text">Your streak is paused.</p>
+      <button type="button" class="renew-btn" data-action="open-renew"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path class="fl-out" d="M12 2s1 3.2-1.2 5.6C8.6 10 6 12 6 15.5a6 6 0 0 0 12 0c0-2.2-1-3.8-2.2-5.2-.3 1.4-1 2.2-1.9 2.6.4-3.6-.6-7.6-1.9-10.9z"/><path class="fl-in" d="M12 21a3.2 3.2 0 0 0 3.2-3.2c0-1.8-1.4-2.6-2.2-4-.4 1-1 1.4-1.6 2-.9.8-2.6 1.6-2.6 4A3.2 3.2 0 0 0 12 21z"/></svg>Renew your streak</button>
+    </div>
+  </div>
+  <div class="card ci-card" id="h-checkin-card" role="button" tabindex="0" data-action="open-checkin">
+    <span class="ci-eyebrow" id="h-ci-eyebrow">TODAY</span>
+    <h3 id="h-ci-title">How are you taking care of yourself today?</h3>
+    <div class="ci-summary" id="h-ci-summary" hidden></div>
+    <div class="ci-cta" id="h-ci-cta">Check in <svg class="ic" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+  </div>
+</section>
+
+<!-- CHECK-IN -->
+<section class="screen" id="s-checkin">
+  <div class="topbar"><div><h2 class="serif" id="ci-title">Today's check-in</h2><span class="ci-status" id="ci-status" hidden><svg class="ic" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M20 6 9 17 4 12"/></svg>Completed &middot; editing</span></div><button class="iconbtn" data-action="go" data-target="s-home" aria-label="Close check-in"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+
+  <div class="card">
+    <h4 style="margin:0 0 10px; font-size:14px;">How are you feeling today?</h4>
+    <div class="mood-row" id="ci-mood">
+      <div class="mood" data-m="great" tabindex="0" role="button" data-action="pick-mood"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 10h.01M16 10h.01"/><path d="M7.5 14c1.2 2 3 3 4.5 3s3.3-1 4.5-3"/></svg><span>Great</span></div>
+      <div class="mood" data-m="good" tabindex="0" role="button" data-action="pick-mood"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 10h.01M16 10h.01"/><path d="M8.5 14.5c1 1 2.2 1.5 3.5 1.5s2.5-.5 3.5-1.5"/></svg><span>Good</span></div>
+      <div class="mood" data-m="okay" tabindex="0" role="button" data-action="pick-mood"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 10h.01M16 10h.01"/><path d="M8.5 15h7"/></svg><span>Okay</span></div>
+      <div class="mood" data-m="tired" tabindex="0" role="button" data-action="pick-mood"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M7.5 10.5h2M14.5 10.5h2"/><path d="M8.5 15h7"/></svg><span>Tired</span></div>
+      <div class="mood" data-m="low" tabindex="0" role="button" data-action="pick-mood"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 10.5h.01M16 10.5h.01"/><path d="M8.5 16c1-1.2 2.2-1.8 3.5-1.8s2.5.6 3.5 1.8"/></svg><span>Low</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="field" style="margin-bottom:0;"><label for="ci-weight">Today's weight</label><input id="ci-weight" type="number" step="0.1" placeholder="e.g. 68.4" aria-describedby="ci-weight-prev"> <span id="ci-weight-prev" style="display:block; margin-top:6px; font-size:12px; color:var(--sub);"></span></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+      <h4 style="margin:0; font-size:14px; display:flex; align-items:center; gap:6px;"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" stroke="var(--emerald)" aria-hidden="true"><path d="M12 2.5s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>Hydration</h4>
+      <button type="button" class="editgoal" data-action="edit-goal" aria-label="Edit daily hydration goal">Goal: <span id="ci-water-goal-label">2.5 L</span><span class="editgoal-cta">Edit</span></button>
+    </div>
+    <div class="water-box">
+      <div class="water-input">
+        <label for="ci-water-input" class="water-label">Water consumed</label>
+        <div class="water-line"><input id="ci-water-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-describedby="ci-water-goalnote"><span class="water-unit">L</span><span class="water-goalnote" id="ci-water-goalnote">/ <span id="ci-water-goal-num">2.5</span> L</span></div>
+      </div>
+      <div class="wctrl"><button data-action="adj-water" data-n="-250" aria-label="Remove 250 millilitres">&minus;</button><button data-action="adj-water" data-n="250" aria-label="Add 250 millilitres">+</button></div>
+    </div>
+    <div class="err" id="e-ci-water" role="alert"></div>
+    <div class="track"><i id="ci-water-track" style="width:0%"></i></div>
+    <div class="water-msg" id="ci-water-msg">Let's get started.</div>
+    <div class="quickadd"><button data-action="adj-water" data-n="250">+0.25 L</button><button data-action="adj-water" data-n="500">+0.5 L</button></div>
+  </div>
+
+  <div class="card">
+    <h4 style="margin:0 0 10px; font-size:14px;">Meals</h4>
+    <div class="meal-sec"><h4>Breakfast</h4><div id="ci-meal-breakfast"></div><div class="addmeal" role="button" tabindex="0" data-action="add-meal" data-cat="breakfast">+ Add meal</div></div>
+    <div class="meal-sec"><h4>Lunch</h4><div id="ci-meal-lunch"></div><div class="addmeal" role="button" tabindex="0" data-action="add-meal" data-cat="lunch">+ Add meal</div></div>
+    <div class="meal-sec"><h4>Dinner</h4><div id="ci-meal-dinner"></div><div class="addmeal" role="button" tabindex="0" data-action="add-meal" data-cat="dinner">+ Add meal</div></div>
+    <div class="meal-sec" style="margin-bottom:0;"><h4>Snacks</h4><div id="ci-meal-snacks"></div><div class="addmeal" role="button" tabindex="0" data-action="add-meal" data-cat="snacks">+ Add snack</div></div>
+  </div>
+
+  <div class="card">
+    <h4 style="margin:0 0 10px; font-size:14px;">Did you move today?</h4>
+    <div style="display:flex; gap:10px; margin-bottom:12px;">
+      <div class="choice-card" id="ci-ex-yes" tabindex="0" role="button" data-action="set-exercise" data-yes="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11M4 8l4-4 3 3-4 4-3-3zm9 9l4-4 3 3-4 4-3-3zM9 15l6-6"/></svg><span>I moved today</span></div>
+      <div class="choice-card on" id="ci-ex-no" tabindex="0" role="button" data-action="set-exercise" data-yes="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg><span>Rest day</span></div>
+    </div>
+    <div id="ci-ex-detail" style="display:none;">
+      <div class="field"><label for="ci-ex-type">Workout type</label>
+        <select id="ci-ex-type"><option>Walking</option><option>Running</option><option>Gym</option><option>Home workout</option><option>Other</option></select>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="ci-ex-dur">Duration</label>
+        <div class="dur-row">
+          <input id="ci-ex-dur" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 30" aria-describedby="e-ci-ex-dur">
+          <div class="unit-toggle" role="radiogroup" aria-label="Duration unit">
+            <button type="button" role="radio" aria-checked="true" class="on" id="ci-ex-unit-minutes" data-action="set-ex-unit" data-unit="minutes">Minutes</button>
+            <button type="button" role="radio" aria-checked="false" id="ci-ex-unit-hours" data-action="set-ex-unit" data-unit="hours">Hours</button>
+          </div>
+        </div>
+        <div class="err" id="e-ci-ex-dur" role="alert"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:22px;">
+    <h4 style="margin:0 0 10px; font-size:14px;">How was today?</h4>
+    <textarea id="ci-notes" rows="3" aria-label="How was today?" placeholder="How did today feel?" style="width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font-family:inherit; font-size:14px; resize:none;"></textarea>
+  </div>
+
+  <button class="btn" id="ci-save-btn" data-action="save-checkin">Save check-in</button>
+  <div style="height:20px"></div>
+</section>
+
+<!-- PROGRESS -->
+<section class="screen" id="s-progress">
+  <div class="topbar"><h2 class="serif">Your Progress</h2></div>
+  <div class="card" style="text-align:center;">
+    <div style="display:flex; justify-content:space-around;">
+      <div><div style="color:var(--sub); font-size:11.5px;">START</div><b class="serif" id="p-start" style="font-size:18px;">—</b></div>
+      <div><div style="color:var(--sub); font-size:11.5px;">NOW</div><b class="serif" id="p-now" style="font-size:18px; color:var(--emerald);">—</b></div>
+      <div><div style="color:var(--sub); font-size:11.5px;">GOAL</div><b class="serif" id="p-goal" style="font-size:18px;">—</b></div>
+    </div>
+  </div>
+  <div class="card empty-card" id="p-empty" style="display:none;"><b class="serif">No progress history yet</b><p>Your progress will appear here once you log your first check-in.</p><button class="btn" data-action="open-checkin">Start your first check-in</button></div>
+  <div class="range-picker" id="p-ranges" role="group" aria-label="Progress range">
+    <button type="button" class="rchip" data-action="set-range" data-r="7" aria-pressed="false">7 days</button>
+    <button type="button" class="rchip" data-action="set-range" data-r="14" aria-pressed="false">14 days</button>
+    <button type="button" class="rchip on" data-action="set-range" data-r="30" aria-pressed="true">30 days</button>
+    <button type="button" class="rchip" data-action="set-range" data-r="60" aria-pressed="false">60 days</button>
+    <button type="button" class="rchip" data-action="set-range" data-r="90" aria-pressed="false">90 days</button>
+    <button type="button" class="rchip" data-action="set-range" data-r="all" aria-pressed="false">All</button>
+    <button type="button" class="rchip" data-action="set-range" data-r="custom" aria-pressed="false" aria-controls="p-custom">Custom</button>
+  </div>
+  <div class="range-custom" id="p-custom" hidden>
+    <label for="p-custom-days">Show the last</label>
+    <input id="p-custom-days" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" placeholder="45" aria-describedby="e-p-custom">
+    <span>days</span>
+    <button type="button" class="rchip on" data-action="apply-custom-range">Apply</button>
+  </div>
+  <div class="err" id="e-p-custom" role="alert"></div>
+  <div class="range-note" id="p-rangenote" aria-live="polite"><b id="p-rangetitle">30-day view</b><span id="p-rangesub"></span></div>
+  <div class="card chart-card"><svg id="p-chart" viewBox="0 0 320 200" width="100%" role="img" aria-label="Weight over time"></svg><div class="chart-foot" id="p-chartfoot"></div></div>
+  <div class="stat-grid">
+    <div class="stat"><svg class="ic stat-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l7 7 4-4 5 5M20 15v-5h-5"/></svg><b id="st-change">—</b><span id="st-change-lbl">Change in this view</span></div>
+    <div class="stat"><svg class="ic stat-ic" viewBox="0 0 24 24" aria-hidden="true"><path class="fl-out" d="M12 2s1 3.2-1.2 5.6C8.6 10 6 12 6 15.5a6 6 0 0 0 12 0c0-2.2-1-3.8-2.2-5.2-.3 1.4-1 2.2-1.9 2.6.4-3.6-.6-7.6-1.9-10.9z"/><path class="fl-in" d="M12 21a3.2 3.2 0 0 0 3.2-3.2c0-1.8-1.4-2.6-2.2-4-.4 1-1 1.4-1.6 2-.9.8-2.6 1.6-2.6 4A3.2 3.2 0 0 0 12 21z"/></svg><b id="st-streak">—</b><span id="st-streak-lbl">Current streak</span></div>
+    <div class="stat"><svg class="ic stat-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17 4 12"/></svg><b id="st-checkins">—</b><span>Days recorded</span></div>
+    <div class="stat"><svg class="ic stat-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 4a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/><path d="M6 21l3-6 2-2-1-4 4 1 2 3 3 1"/></svg><b id="st-workouts">—</b><span>Workouts</span></div>
+    <div class="stat"><svg class="ic stat-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg><b id="st-water">—</b><span id="st-water-lbl">Average water</span></div>
+    <div class="stat"><svg class="ic stat-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></svg><b id="st-consistency">—</b><span id="st-consistency-lbl">Consistency</span></div>
+  </div>
+</section>
+
+<!-- JOURNEY -->
+<section class="screen" id="s-journey">
+  <div class="topbar"><h2 class="serif">My Journey</h2></div>
+  <div class="notice" id="j-daylabel">&nbsp;</div>
+  <div class="card">
+    <div class="cal-head"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+    <div class="cal-grid" id="j-cal"></div>
+  </div>
+  <div class="card" id="j-detail" aria-live="polite"><div id="j-detail-inner"><div class="empty">Tap a day to see what you logged.</div></div></div>
+</section>
+
+<!-- ACHIEVEMENTS -->
+<section class="screen" id="s-ach">
+  <div class="topbar"><h2 class="serif">Achievements</h2></div>
+  <div class="card empty-card" id="ach-empty" style="display:none;"><b class="serif">No achievements unlocked yet</b><p>Complete your first check-in to earn your first one.</p><button class="btn" data-action="open-checkin">Start your first check-in</button></div>
+  <div class="ach-grid" id="ach-grid"></div>
+</section>
+
+<!-- PROFILE -->
+<section class="screen" id="s-profile">
+  <div class="topbar"><h2 class="serif">Profile</h2><button class="iconbtn" data-action="tab" data-s="s-home" aria-label="Back to home"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+  <div class="profile-head">
+    <div class="avatar" id="pf-init">K</div>
+    <div class="serif" style="font-size:19px;" id="pf-name">—</div>
+    <div style="color:var(--sub); font-size:13px;" id="pf-email">—</div>
+  </div>
+  <div class="card">
+    <div class="rowlink static"><span>Journey length</span><span class="sub" id="pf-journey">—</span></div>
+    <div class="rowlink static"><span>Starting weight</span><span class="sub" id="pf-startw">—</span></div>
+    <div class="rowlink static"><span>Goal weight</span><span class="sub" id="pf-goalw">—</span></div>
+    <div class="rowlink static"><span>Start date <small>(Day 1)</small></span><span class="sub" id="pf-startd">—</span></div>
+    <div class="rowlink static"><span>Goal date <small>(last day)</small></span><span class="sub" id="pf-goald">—</span></div>
+  </div>
+  <div class="card">
+    <h4 style="margin:0 0 4px; font-size:13.5px; color:var(--sub);">Appearance</h4>
+    <div class="theme-row" role="group" aria-label="Appearance">
+      <div class="theme-opt" data-t="dark" tabindex="0" role="button" data-action="set-theme">Dark</div>
+      <div class="theme-opt" data-t="light" tabindex="0" role="button" data-action="set-theme">Light</div>
+      <div class="theme-opt" data-t="system" tabindex="0" role="button" data-action="set-theme">System</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="rowlink" id="pf-share" tabindex="0" role="button" data-action="open-share"><span>Share my progress</span><span class="sub">→</span></div>
+    <div class="rowlink" id="pf-changepw" tabindex="0" role="button" data-action="open-password"><span>Change password</span><span class="sub">→</span></div>
+    <div class="rowlink" id="pf-logout" tabindex="0" role="button" data-action="logout"><span style="color:var(--danger);">Log out</span><span class="sub">→</span></div>
+  </div>
+</section>
+
+</div>
+
+<div class="bottomnav" id="nav" style="display:none;">
+  <button class="navbtn" data-s="s-home" data-action="tab"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Home</button>
+  <button class="navbtn" data-s="s-progress" data-action="tab"><svg viewBox="0 0 24 24"><path d="M4 19V10M11 19V5M18 19v-7"/></svg>Progress</button>
+  <button class="navbtn fab" data-action="open-checkin" aria-label="Today's check-in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="navbtn" data-s="s-journey" data-action="tab"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Journey</button>
+  <button class="navbtn" data-s="s-ach" data-action="tab"><svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4a2 2 0 0 0 2 4M17 6h3a2 2 0 0 1-2 4"/></svg>More</button>
+</div>
+
+<div class="overlay" id="ov-celebrate"><div class="sheet celebrate" role="dialog" aria-modal="true" aria-labelledby="cel-title">
+  <div class="ic cel-check"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+  <div class="ov-eyebrow" id="cel-eyebrow">Check-in complete</div>
+  <h2 class="serif" id="cel-title">You're showing up for yourself.</h2>
+  <div style="margin:12px 0 2px; font-size:14.5px; font-weight:600;" id="cel-streak">&nbsp;</div>
+  <ul class="cel-list" id="cel-list"></ul>
+  <button class="btn" data-action="close-overlay" data-target="ov-celebrate" style="margin-top:16px;">Continue</button>
+</div></div>
+
+<div class="overlay" id="ov-milestone"><div class="sheet celebrate" role="dialog" aria-modal="true" aria-label="Achievement unlocked">
+  <div class="sparkle-wrap">
+    <div class="ic" style="width:56px;height:56px;border-radius:50%;background:var(--emerald-tint);display:flex;align-items:center;justify-content:center;box-shadow:0 0 22px var(--emerald-glow);"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4a2 2 0 0 0 2 4M17 6h3a2 2 0 0 1-2 4"/></svg></div>
+    <span class="spk"></span><span class="spk"></span><span class="spk"></span><span class="spk"></span>
+  </div>
+  <div class="ov-eyebrow">Achievement unlocked</div>
+  <h2 class="serif" id="mi-title">&nbsp;</h2><p id="mi-sub">You unlocked a new achievement.</p>
+  <button class="btn" id="mi-btn" data-action="close-overlay" data-target="ov-milestone" style="margin-top:14px;">Nice!</button>
+</div></div>
+
+<div class="overlay" id="ov-achdetail"><div class="sheet celebrate" role="dialog" aria-modal="true" aria-label="Achievement details">
+  <div id="ad-icwrap" class="ic" style="width:64px;height:64px;border-radius:50%;background:var(--emerald-tint);display:flex;align-items:center;justify-content:center;margin:0 auto 14px; color:var(--emerald);"></div>
+  <h2 class="serif" id="ad-title">&nbsp;</h2>
+  <p id="ad-desc" style="margin:0 0 14px;"></p>
+  <div id="ad-status" style="font-weight:600; font-size:13.5px; display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:10px;"></div>
+  <div id="ad-progress" style="margin-bottom:16px;">
+    <div class="track"><i id="ad-progress-bar" style="width:0%"></i></div>
+    <div style="font-size:11.5px; color:var(--sub); margin-top:6px;" id="ad-progress-label"></div>
+  </div>
+  <button class="btn" data-action="close-overlay" data-target="ov-achdetail">Close</button>
+</div></div>
+
+<div class="overlay" id="ov-goal"><div class="sheet" role="dialog" aria-modal="true" aria-label="Daily hydration goal">
+  <div class="sheet-close" role="button" tabindex="0" data-action="close-overlay" data-target="ov-goal">Cancel</div>
+  <h3 class="serif" style="margin-top:0;">Daily hydration goal</h3>
+  <div class="field"><label for="goal-input">Goal (litres)</label><input id="goal-input" type="number" step="0.1" min="0.5" max="6"></div>
+  <button class="btn" data-action="save-goal">Save goal</button>
+</div></div>
+
+<div class="overlay" id="ov-meal"><div class="sheet" role="dialog" aria-modal="true" aria-label="Meal">
+  <div class="sheet-close" role="button" tabindex="0" data-action="close-overlay" data-target="ov-meal">Cancel</div>
+  <h3 class="serif" id="meal-modal-title" style="margin-top:0;">What did you eat?</h3>
+  <div class="field"><label for="meal-name">Food name</label><input id="meal-name" placeholder="e.g. Eggs & toast"></div>
+  <div class="field"><label for="meal-time">Time</label><input id="meal-time" type="time"></div>
+  <div class="field"><label for="meal-notes">Notes (optional)</label><input id="meal-notes" placeholder=""></div>
+  <button class="btn" data-action="confirm-meal">Save</button>
+  <button class="btn secondary" id="meal-delete-btn" style="margin-top:10px; display:none; color:var(--danger); border-color:var(--danger);" data-action="delete-meal-modal">Delete meal</button>
+</div></div>
+
+<div class="overlay" id="ov-share"><div class="sheet share-sheet" role="dialog" aria-modal="true" aria-label="Share my progress">
+  <div class="share-card" id="sh-card">
+    <div class="share-brand">KAWTHER | CREATES</div>
+    <div class="share-day" id="sh-day">DAY 1</div>
+    <div class="share-of" id="sh-of"></div>
+    <ul class="share-rows" id="sh-rows"></ul>
+    <div class="share-tag">Consistency in motion</div>
+  </div>
+  <div class="share-actions">
+    <button class="btn" id="sh-share-btn" data-action="do-share">Share progress</button>
+    <button class="btn secondary" data-action="save-share-image">Save image</button>
+    <div class="share-status" id="sh-status" role="status" aria-live="polite"></div>
+    <button class="btn secondary" data-action="close-overlay" data-target="ov-share">Done</button>
+  </div>
+</div></div>
+
+<div class="overlay" id="ov-logout"><div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="lo-title" aria-describedby="lo-desc">
+  <h3 class="serif" id="lo-title" style="margin-top:0;">Log out?</h3>
+  <p id="lo-desc" style="color:var(--sub); font-size:14px; line-height:1.55; margin:0 0 18px;">Are you sure you want to log out of your journal?</p>
+  <div class="dialog-actions">
+    <button class="btn secondary" id="lo-cancel" data-action="close-overlay" data-target="ov-logout">Cancel</button>
+    <button class="btn danger" id="lo-confirm" data-action="confirm-logout">Log out</button>
+  </div>
+</div></div>
+
+<div class="overlay" id="ov-password"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pw-title">
+  <div class="sheet-close" role="button" tabindex="0" data-action="close-overlay" data-target="ov-password">Cancel</div>
+  <h3 class="serif" id="pw-title" style="margin-top:0;">Change password</h3>
+  <form id="pw-form" novalidate autocomplete="off">
+    <div class="field"><label for="pw-current">Current password</label><div class="pw-wrap"><input id="pw-current" type="password" autocomplete="current-password" aria-describedby="e-pw-current"><button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Show password" aria-pressed="false"><svg class="i-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="i-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button></div><div class="err" id="e-pw-current" role="alert"></div></div>
+    <div class="field"><label for="pw-new">New password</label><div class="pw-wrap"><input id="pw-new" type="password" autocomplete="new-password" placeholder="At least 8 characters" aria-describedby="e-pw-new"><button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Show password" aria-pressed="false"><svg class="i-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="i-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button></div><div class="err" id="e-pw-new" role="alert"></div></div>
+    <div class="field"><label for="pw-confirm">Confirm new password</label><div class="pw-wrap"><input id="pw-confirm" type="password" autocomplete="new-password" aria-describedby="e-pw-confirm"><button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Show password" aria-pressed="false"><svg class="i-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="i-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button></div><div class="err" id="e-pw-confirm" role="alert"></div></div>
+    <div class="err form-err" id="e-pw-form" role="alert"></div>
+    <button class="btn" type="submit" id="pw-save">Update password</button>
+  </form>
+  <div class="pw-success" id="pw-success" role="status" hidden>
+    <div class="ic cel-check"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <h3 class="serif">Password updated</h3>
+    <p>Your new password is active. Use it the next time you log in.</p>
+    <button class="btn" data-action="close-overlay" data-target="ov-password">Done</button>
+  </div>
+</div></div>
+
+<div class="overlay" id="ov-renew"><div class="sheet celebrate" role="dialog" aria-modal="true" aria-labelledby="rn-title">
+  <div class="renew-flame" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path class="fl-out" d="M12 2s1 3.2-1.2 5.6C8.6 10 6 12 6 15.5a6 6 0 0 0 12 0c0-2.2-1-3.8-2.2-5.2-.3 1.4-1 2.2-1.9 2.6.4-3.6-.6-7.6-1.9-10.9z"/><path class="fl-in" d="M12 21a3.2 3.2 0 0 0 3.2-3.2c0-1.8-1.4-2.6-2.2-4-.4 1-1 1.4-1.6 2-.9.8-2.6 1.6-2.6 4A3.2 3.2 0 0 0 12 21z"/></svg><span class="spk"></span><span class="spk"></span><span class="spk"></span><span class="spk"></span></div>
+  <div class="ov-eyebrow">Fresh start</div>
+  <h2 class="serif" id="rn-title">Your journey is still yours.</h2>
+  <p id="rn-sub">Ready to keep going?</p>
+  <button class="btn" data-action="continue-journey" id="rn-continue">Continue journey</button>
+</div></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

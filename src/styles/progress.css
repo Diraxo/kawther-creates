@@ -1,0 +1,8 @@
+.tabs{display:flex; gap:8px; margin-bottom:16px;}
+.tab{flex:1; padding:10px; text-align:center; border-radius:12px; border:1px solid var(--line); font-size:13.5px; font-weight:600; color:var(--sub); cursor:pointer;}
+.tab.on{background:var(--ink); color:var(--bg); border-color:var(--ink);}
+
+.stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.stat{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px;}
+.stat b{display:block; font-family:'Plus Jakarta Sans',sans-serif; font-size:20px;}
+.stat span{color:var(--sub); font-size:12px;}

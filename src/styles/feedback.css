@@ -1,0 +1,13 @@
+.ov-eyebrow{font-size:11px; letter-spacing:.08em; color:var(--emerald); font-weight:700; margin-bottom:6px; text-transform:uppercase;}
+.sparkle-wrap{position:relative; width:56px; height:56px; margin:0 auto 14px;}
+.spk{position:absolute; width:5px; height:5px; background:var(--emerald); border-radius:50%; opacity:0; animation:spkPop 1s ease forwards;}
+.spk:nth-child(2){top:-6px; left:10px; animation-delay:.05s;}
+.spk:nth-child(3){top:4px; right:-8px; animation-delay:.15s;}
+.spk:nth-child(4){bottom:-6px; left:18px; animation-delay:.25s;}
+.spk:nth-child(5){top:14px; left:-8px; animation-delay:.35s;}
+@keyframes spkPop{0%{opacity:0; transform:scale(.3);}40%{opacity:1; transform:scale(1);}100%{opacity:0; transform:scale(.6) translateY(-6px);}}
+#ad-icwrap svg{width:26px; height:26px;}
+#ad-icwrap.locked{background:var(--card2); color:var(--sub);}
+
+.kc-toast{position:fixed; left:50%; bottom:110px; transform:translateX(-50%) translateY(10px); background:var(--card2); color:var(--ink); border:1px solid var(--emerald); padding:10px 18px; border-radius:999px; font-size:13px; font-weight:600; opacity:0; transition:all .3s ease; z-index:200; box-shadow:0 8px 24px -8px var(--emerald-glow); white-space:normal; text-align:center; width:max-content; max-width:88vw;}
+.kc-toast.show{opacity:1; transform:translateX(-50%) translateY(0);}

@@ -1,0 +1,9 @@
+.overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:100; padding:20px;}
+.overlay.show{display:flex;}
+.sheet{background:var(--card); border-radius:22px; padding:26px 22px; width:100%; max-width:400px; max-height:85vh; overflow-y:auto; animation:pop .3s cubic-bezier(.2,.8,.2,1);}
+@keyframes pop{from{opacity:0; transform:scale(.92);} to{opacity:1; transform:scale(1);}}
+.sheet-close{text-align:right; color:var(--sub); font-size:13px; cursor:pointer; margin-bottom:6px;}
+.celebrate{text-align:center;}
+.celebrate .ic{font-size:52px; margin-bottom:10px;}
+.celebrate h2{margin:0 0 8px; font-size:22px;}
+.celebrate p{color:var(--sub); font-size:14px;}

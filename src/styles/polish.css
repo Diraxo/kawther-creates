@@ -1,0 +1,166 @@
+/* ---------- Final UX pass: Home / Check-in / Progress / Journey / Profile / dialogs ---------- */
+.sr-only{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
+.muted{color:var(--sub); font-size:13.5px; margin:0;}
+
+/* --- Home header: breathing room + a profile button that reads as one --- */
+.hero-top{align-items:center; margin-bottom:22px;}
+.profilebtn{width:44px; height:44px; min-width:44px; min-height:44px; border-radius:50%; border:1.5px solid color-mix(in srgb, var(--emerald) 45%, var(--line)); background:var(--card); color:var(--emerald); transition:background .2s, border-color .2s, transform .15s, box-shadow .2s; flex:none;}
+.profilebtn:hover{background:var(--emerald-tint); border-color:var(--emerald);}
+.profilebtn:active{transform:scale(.92); background:var(--emerald-tint);}
+.profilebtn:focus-visible{outline:2px solid var(--emerald); outline-offset:3px; border-radius:50%;}
+.profilebtn svg{width:22px; height:22px;}
+
+/* --- Journey card: day label + streak chip on one row --- */
+.hero-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; min-width:0;}
+.hero-day{font-size:12.5px; color:var(--sub); letter-spacing:.06em; font-weight:600; min-width:0;}
+.streak-chip{display:inline-flex; align-items:center; gap:6px; flex:none; padding:6px 11px 6px 9px; border-radius:999px; font-size:11.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; background:var(--emerald-tint); color:var(--emerald); border:1px solid color-mix(in srgb, var(--emerald) 35%, transparent); transition:background .3s, color .3s, border-color .3s;}
+.streak-chip svg{width:16px; height:16px; filter:drop-shadow(0 0 5px var(--emerald-glow));}
+.streak-chip[data-state="none"]{background:var(--card2); color:var(--sub); border-color:var(--line);}
+.streak-chip[data-state="none"] svg{filter:none;}
+.streak-chip[data-state="paused"]{background:color-mix(in srgb, var(--gold) 16%, transparent); color:var(--gold); border-color:color-mix(in srgb, var(--gold) 40%, transparent);}
+.streak-chip[data-state="paused"] svg{filter:none;}
+.hero-stats .delta{margin-top:2px;}
+.hero-goaldate{font-size:11.5px; color:var(--sub); margin-top:6px;}
+.renew-banner{margin-top:16px; padding:14px; border-radius:16px; background:color-mix(in srgb, var(--gold) 12%, var(--card)); border:1px solid color-mix(in srgb, var(--gold) 35%, transparent);}
+.renew-banner[hidden]{display:none;}
+.renew-banner p{margin:0 0 10px; font-size:13px; line-height:1.5;}
+.renew-btn{display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 18px; border-radius:14px; border:none; background:var(--emerald); color:#04150F; font-weight:700; font-size:14px; cursor:pointer; transition:transform .15s, box-shadow .2s;}
+.renew-btn:active{transform:scale(.96);}
+.renew-btn svg{width:16px; height:16px;}
+
+/* --- Today's check-in card (before / after completion) --- */
+.ci-card{min-height:44px;}
+.ci-card:focus-visible{outline:2px solid var(--emerald); outline-offset:3px; border-radius:20px;}
+.ci-summary{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 14px;}
+.ci-summary[hidden]{display:none;}
+.ci-sum-item{background:var(--card2); border-radius:12px; padding:10px 12px; min-width:0;}
+.ci-sum-item span{display:block; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--sub); margin-bottom:3px;}
+.ci-sum-item b{display:block; font-size:13.5px; font-weight:700; overflow-wrap:anywhere;}
+.ci-cta.edit{display:inline-flex; min-height:44px; padding:0 18px; border-radius:14px; border:1.5px solid var(--emerald); background:var(--emerald-tint); justify-content:center;}
+.ci-card:hover .ci-cta.edit{background:var(--emerald); color:#04150F;}
+
+/* --- Check-in form --- */
+.ci-status{display:inline-flex; align-items:center; gap:5px; margin-top:4px; font-size:12px; font-weight:700; color:var(--emerald); background:var(--emerald-tint); padding:3px 10px; border-radius:999px;}
+.ci-status[hidden]{display:none;}
+.ci-status svg{width:13px; height:13px;}
+.editgoal{display:inline-flex; align-items:center; gap:8px; min-height:44px; margin:-8px 0; padding:0 4px 0 0; background:none; border:none; font:inherit; font-size:12px; color:var(--sub); cursor:pointer;}
+.editgoal-cta{display:inline-flex; align-items:center; min-height:32px; padding:0 12px; border-radius:999px; border:1.5px solid var(--emerald); background:var(--emerald-tint); color:var(--emerald); font-weight:700; font-size:12.5px; transition:background .2s, color .2s;}
+.editgoal:hover .editgoal-cta{background:var(--emerald); color:#04150F;}
+.editgoal:hover{color:var(--sub);}
+.water-box{align-items:flex-end; gap:12px;}
+.water-input{flex:1; min-width:0;}
+.water-label{display:block; font-size:12px; color:var(--sub); margin-bottom:2px;}
+.water-line{display:flex; align-items:baseline; gap:6px; border-bottom:2px solid var(--line); transition:border-color .2s; padding-bottom:2px; min-width:0;}
+.water-line:focus-within{border-color:var(--emerald);}
+.water-line input{width:4.2ch; min-width:0; flex:none; border:none; outline:none; background:transparent; color:var(--ink); font-family:'Plus Jakarta Sans',sans-serif; font-size:26px; font-weight:700; padding:2px 0; text-align:right;}
+.water-unit{font-family:'Plus Jakarta Sans',sans-serif; font-size:18px; font-weight:600;}
+.water-goalnote{font-size:14px; color:var(--sub); margin-left:4px; white-space:nowrap;}
+.wctrl button{width:44px; height:44px; transition:transform .12s, background .2s;}
+.wctrl button:active{transform:scale(.9); background:var(--emerald-tint);}
+.dur-row{display:flex; gap:10px; align-items:stretch; flex-wrap:wrap;}
+.dur-row input{flex:1 1 90px; min-width:0; padding:14px 16px; border-radius:14px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:16px; outline:none;}
+.dur-row input:focus{border-color:var(--emerald);}
+.dur-row input[aria-invalid="true"]{border-color:var(--danger);}
+.unit-toggle{display:inline-flex; flex:0 0 auto; padding:3px; border-radius:14px; border:1px solid var(--line); background:var(--card2);}
+.unit-toggle button{min-height:44px; padding:0 14px; border:none; border-radius:11px; background:transparent; color:var(--sub); font-weight:600; font-size:13.5px; cursor:pointer; transition:background .2s, color .2s;}
+.unit-toggle button.on{background:var(--emerald); color:#04150F;}
+.err:not(:empty){display:block;}
+
+/* --- Completion sheet --- */
+.cel-check{width:56px; height:56px; border-radius:50%; background:var(--emerald-tint); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; box-shadow:0 0 22px var(--emerald-glow); animation:popIn .5s cubic-bezier(.2,.9,.3,1.3) both;}
+.cel-list{list-style:none; padding:0; margin:12px 0 0; text-align:left; display:grid; gap:8px;}
+.cel-list li{display:flex; gap:10px; align-items:flex-start; font-size:13.5px; line-height:1.4; padding:10px 12px; border-radius:12px; background:var(--card2);}
+.cel-list li svg{flex:none; margin-top:2px; width:15px; height:15px;}
+.cel-list li.open svg{stroke:var(--gold);}
+.cel-list li.done svg{stroke:var(--emerald);}
+@keyframes popIn{from{opacity:0; transform:scale(.6);} to{opacity:1; transform:scale(1);}}
+
+/* --- Progress --- */
+.range-picker{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
+.rchip{min-height:44px; padding:0 14px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--sub); font-size:13.5px; font-weight:600; cursor:pointer; transition:background .2s, color .2s, border-color .2s, transform .12s;}
+.rchip:active{transform:scale(.95);}
+.rchip.on{background:var(--ink); color:var(--bg); border-color:var(--ink);}
+.range-custom{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; font-size:13.5px; color:var(--sub);}
+.range-custom[hidden]{display:none;}
+.range-custom input{width:84px; min-height:44px; padding:0 12px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:16px; outline:none;}
+.range-custom input:focus{border-color:var(--emerald);}
+.range-custom input[aria-invalid="true"]{border-color:var(--danger);}
+#e-p-custom{margin:-4px 0 10px;}
+.range-note{display:flex; flex-direction:column; gap:2px; margin:0 0 12px; font-size:13px; color:var(--sub); line-height:1.5;}
+.range-note b{color:var(--ink); font-size:14px;}
+.chart-card{padding:14px 10px 10px;}
+.chart-card svg{display:block; width:100%; height:auto; overflow:visible; touch-action:manipulation;}
+.chart-foot{font-size:12px; color:var(--sub); text-align:center; margin-top:4px; min-height:1em;}
+g[data-chart-point]:focus-visible .chart-hit{stroke:var(--emerald); stroke-width:2;}
+.stat span{display:block; line-height:1.35;}
+.stat b{font-variant-numeric:tabular-nums;}
+
+/* --- Journey: selection + day detail --- */
+#j-detail{scroll-margin-top:16px;}
+.cal-day{transition:transform .18s cubic-bezier(.2,.9,.3,1.3), outline-color .2s, background .2s; min-height:32px;}
+.cal-day:hover{transform:scale(1.06);}
+.cal-day.sel{outline:2.5px solid var(--emerald); outline-offset:2px; transform:scale(1.1); z-index:1; animation:selPop .32s cubic-bezier(.2,.9,.3,1.3);}
+.cal-day.goalday{box-shadow:inset 0 0 0 1.5px var(--gold);}
+@keyframes selPop{0%{transform:scale(.85);} 100%{transform:scale(1.1);}}
+#j-detail-inner.swap{animation:detailIn .35s cubic-bezier(.16,.84,.44,1);}
+@keyframes detailIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+.daytitle{margin:0 0 4px; font-size:18px; outline:none; scroll-margin-top:16px;}
+.daypill{margin-bottom:10px;}
+.detail-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;}
+.dcard{background:var(--card2); border-radius:14px; padding:12px; min-width:0;}
+.dcard span{display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--sub); margin-bottom:4px;}
+.dcard b{display:block; font-family:'Plus Jakarta Sans',sans-serif; font-size:15px; overflow-wrap:anywhere;}
+
+/* --- Profile --- */
+.rowlink{min-height:48px;}
+.rowlink:focus-visible{outline:2px solid var(--emerald); outline-offset:-2px; border-radius:10px;}
+.rowlink.static{cursor:default;}
+.rowlink small{color:var(--sub); font-size:11px; margin-left:4px;}
+.rowlink .sub{text-align:right; margin-left:12px;}
+.ach.locked{opacity:.75;}
+.ach p{line-height:1.4;}
+
+/* --- Dialogs: logout, password, share, renew --- */
+.btn.danger{background:var(--danger); color:#fff; box-shadow:none;}
+.dialog-actions{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.dialog-actions .btn{padding:14px 8px;}
+.form-err{margin:0 0 12px;}
+.pw-success{text-align:center;}
+.pw-success[hidden], #pw-form[hidden]{display:none;}
+.pw-success p{color:var(--sub); font-size:14px; line-height:1.55;}
+.share-sheet{padding:0; overflow:hidden;}
+.share-card{background:linear-gradient(160deg,var(--emerald-deep),var(--emerald)); color:#fff; padding:30px 22px 26px; text-align:center;}
+.share-brand{font-family:'Plus Jakarta Sans',sans-serif; font-size:13px; letter-spacing:.14em; opacity:.85;}
+.share-day{font-family:'Plus Jakarta Sans',sans-serif; font-size:40px; font-weight:800; margin-top:14px; line-height:1;}
+.share-of{font-family:'Plus Jakarta Sans',sans-serif; font-size:16px; font-weight:600; opacity:.85; margin-top:4px;}
+.share-rows{list-style:none; margin:18px 0 0; padding:0; display:grid; gap:8px; font-family:'Plus Jakarta Sans',sans-serif; font-weight:700; font-size:15px; letter-spacing:.03em;}
+.share-rows .none{font-weight:500; opacity:.85; font-size:13.5px; letter-spacing:0;}
+.share-tag{margin-top:18px; font-size:13px; opacity:.9;}
+.share-actions{padding:16px 22px 22px; display:grid; gap:10px;}
+.share-status{min-height:1.2em; font-size:12.5px; text-align:center; color:var(--sub);}
+.share-status[data-kind="ok"]{color:var(--emerald);}
+.share-status[data-kind="error"]{color:var(--danger);}
+.renew-flame{position:relative; width:64px; height:64px; margin:0 auto 14px; border-radius:50%; background:var(--emerald-tint); color:var(--emerald); display:flex; align-items:center; justify-content:center; box-shadow:0 0 26px var(--emerald-glow); animation:popIn .5s cubic-bezier(.2,.9,.3,1.3) both;}
+.renew-flame .ic{width:30px; height:30px;}
+#rn-continue{margin-top:14px;}
+
+@media(prefers-reduced-motion:reduce){
+  .cal-day.sel,.cel-check,.renew-flame,#j-detail-inner.swap{animation:none !important;}
+}
+@media(max-width:340px){
+  .streak-chip{font-size:10.5px; padding:5px 9px 5px 7px; letter-spacing:.04em;}
+  .ci-summary{grid-template-columns:1fr;}
+  .detail-grid{grid-template-columns:1fr;}
+  .water-line input{font-size:22px;}
+  .dur-row{flex-direction:column;}
+  .unit-toggle{align-self:stretch;}
+  .unit-toggle button{flex:1;}
+}
+
+/* Streak flame: real-app look (orange→yellow gradient, bright core) instead of a theme-coloured outline */
+svg.ic .fl-out{fill:url(#flameOut); stroke:none;}
+svg.ic .fl-in{fill:url(#flameIn); stroke:none;}
+.streak-chip svg, .stat-ic, .renew-flame .ic{filter:drop-shadow(0 0 5px rgba(255,122,0,.55));}
+.streak-chip[data-state="none"] svg{filter:grayscale(1) opacity(.55);}
+.streak-chip[data-state="paused"] svg{filter:grayscale(.6) opacity(.8);}
+.renew-btn svg{filter:none;}

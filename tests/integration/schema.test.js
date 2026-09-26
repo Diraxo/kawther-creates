@@ -1,0 +1,190 @@
+// Runs supabase/schema.sql against a REAL Postgres (PGlite, in-process WASM) with a Supabase-style
+// auth stub, then attacks it as different users through the `authenticated`/`anon` roles.
+// This proves the SQL (RLS, grants, composite FK, RPC atomicity). It does NOT prove the hosted
+// Supabase project is configured the same way — that is what tests/live/ is for.
+import test, { before } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { PGlite } from '@electric-sql/pglite';
+
+const SCHEMA = readFileSync(new URL('../../supabase/schema.sql', import.meta.url), 'utf8');
+const A = '11111111-1111-1111-1111-111111111111';
+const B = '22222222-2222-2222-2222-222222222222';
+const CAROL = '33333333-3333-3333-3333-333333333333';
+
+let db;
+
+before(async () => {
+  db = new PGlite();
+  await db.exec(`
+    create role anon nologin; create role authenticated nologin;
+    create schema auth;
+    create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb);
+    create function auth.uid() returns uuid language sql stable
+      as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+    grant usage on schema auth, public to anon, authenticated;
+    grant execute on function auth.uid() to anon, authenticated;
+  `);
+  await db.exec(SCHEMA);
+  await db.exec(`
+    grant usage on schema public to anon, authenticated;
+    insert into auth.users values ('${A}', 'a@x.com', '{"full_name":"Alice"}'),
+                                  ('${B}', 'b@x.com', '{"full_name":"Bob"}'),
+                                  ('${CAROL}', 'carol@example.com', '{"full_name":"Kawther"}');
+  `);
+});
+
+/** Runs fn as a Supabase user (or anon when uid is null); always resets the role afterwards. */
+async function as(uid, fn) {
+  await db.exec(uid ? `set role authenticated; select set_config('request.jwt.claim.sub', '${uid}', false);` : `set role anon; select set_config('request.jwt.claim.sub', '', false);`);
+  try { return await fn(); } finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`); }
+}
+const denied = (p) => assert.rejects(p, /permission denied|row-level security|violates|not authenticated/i);
+const payload = (over = {}) => ({
+  mood: 'good', weight_kg: 70.5, water_ml: 2000, exercise_type: 'Gym', exercise_minutes: 30, notes: 'n',
+  meals: [
+    { category: 'breakfast', name: 'Eggs', notes: '', eaten_at: '08:30', position: 0 },
+    { category: 'lunch', name: 'Salad', notes: 'x', eaten_at: '13:00', position: 0 },
+  ],
+  ...over,
+});
+const save = (uid, date, p) => as(uid, () => db.query('select public.save_checkin($1::date, $2::jsonb) as id', [date, JSON.stringify(p)]));
+
+test('signup trigger creates a profile from auth.users (no password column anywhere in public)', async () => {
+  const r = await db.query(`select id, full_name, email, onboarded from public.profiles order by email`);
+  assert.deepEqual(r.rows.map((x) => x.full_name), ['Alice', 'Bob', 'Kawther']);
+  assert.equal(r.rows.every((x) => x.onboarded === false), true);
+  const cols = await db.query(`select column_name from information_schema.columns where table_schema='public' and column_name ilike '%pass%'`);
+  assert.equal(cols.rows.length, 0);
+});
+
+test('anon can read/write nothing, and cannot call the RPCs', async () => {
+  await denied(as(null, () => db.query('select * from public.profiles')));
+  await denied(as(null, () => db.query('select * from public.checkins')));
+  await denied(as(null, () => db.query(`select public.save_checkin('2026-09-01', '{}'::jsonb)`)));
+});
+
+test('journey: create_journey is atomic + sets onboarded; users see only their own', async () => {
+  await as(A, () => db.query(`select public.create_journey('2026-09-01', 90, 72, 62, 2500)`));
+  await as(B, () => db.query(`select public.create_journey('2026-09-10', 30, 90, 80, 3000)`));
+  assert.equal((await as(A, () => db.query('select * from public.journeys'))).rows.length, 1);
+  assert.equal((await as(A, () => db.query('select onboarded from public.profiles'))).rows[0].onboarded, true);
+  assert.equal((await as(B, () => db.query('select duration_days from public.journeys'))).rows[0].duration_days, 30);
+  // constraint failure inside the RPC rolls back the profile flag too
+  await as(CAROL, async () => { await assert.rejects(db.query(`select public.create_journey('2026-09-01', 6, 72, 62, 2500)`), /violates/); });
+  await as(CAROL, async () => { await assert.rejects(db.query(`select public.create_journey('2026-09-01', 366, 72, 62, 2500)`), /violates/); });
+  assert.equal((await db.query(`select onboarded from public.profiles where id='${CAROL}'`)).rows[0].onboarded, false);
+});
+
+test('journey: any custom length 7..365 is accepted', async () => {
+  for (const d of [7, 45, 120, 365]) {
+    await as(A, () => db.query(`select public.create_journey('2026-09-01', ${d}, 72, 62, 2500)`));
+    assert.equal((await as(A, () => db.query('select duration_days from public.journeys'))).rows[0].duration_days, d);
+  }
+  await as(A, () => db.query(`select public.create_journey('2026-09-01', 90, 72, 62, 2500)`));
+});
+
+test('save_checkin: upserts, replaces meals, persists round trip', async () => {
+  await save(A, '2026-09-02', payload());
+  await save(A, '2026-09-02', payload({ water_ml: 2600, meals: [{ category: 'dinner', name: 'Fish', notes: '', eaten_at: '19:00', position: 0 }] }));
+  const c = (await as(A, () => db.query('select * from public.checkins'))).rows;
+  assert.equal(c.length, 1); // upsert, not duplicate
+  assert.equal(c[0].water_ml, 2600);
+  const m = (await as(A, () => db.query('select category, name from public.checkin_meals'))).rows;
+  assert.deepEqual(m, [{ category: 'dinner', name: 'Fish' }]); // old meals replaced
+});
+
+test('save_checkin is ATOMIC: a bad meal rolls back the check-in change and keeps old meals', async () => {
+  await save(A, '2026-09-03', payload());
+  const before = (await as(A, () => db.query('select water_ml from public.checkins where checkin_date = $1', ['2026-09-03']))).rows[0].water_ml;
+  const bad = payload({ water_ml: 9999, meals: [
+    { category: 'breakfast', name: 'Fine', notes: '', eaten_at: '08:00', position: 0 },
+    { category: 'brunch', name: 'Bad category', notes: '', eaten_at: '09:00', position: 1 },
+  ] });
+  await assert.rejects(save(A, '2026-09-03', bad), /violates|check/i);
+  const after = (await as(A, () => db.query('select water_ml from public.checkins where checkin_date = $1', ['2026-09-03']))).rows[0].water_ml;
+  assert.equal(after, before);
+  const meals = (await as(A, () => db.query(`select name from public.checkin_meals m join public.checkins c on c.id=m.checkin_id where c.checkin_date='2026-09-03' order by m.category`))).rows;
+  assert.deepEqual(meals.map((x) => x.name), ['Eggs', 'Salad']);
+  // a brand-new day with a bad meal leaves NO orphan check-in
+  await assert.rejects(save(A, '2026-09-04', bad));
+  assert.equal((await as(A, () => db.query(`select 1 from public.checkins where checkin_date='2026-09-04'`))).rows.length, 0);
+});
+
+test('save_checkin rejects unauthenticated callers, future dates and oversized payloads', async () => {
+  await assert.rejects(as(null, () => db.query(`select public.save_checkin('2026-09-01', '{}'::jsonb)`)), /permission denied|not authenticated/);
+  await assert.rejects(save(A, '2099-01-01', payload()), /invalid check-in date/);
+  const many = Array.from({ length: 41 }, (_, i) => ({ category: 'snacks', name: 'x' + i, eaten_at: '10:00', position: i }));
+  await assert.rejects(save(A, '2026-09-05', payload({ meals: many })), /invalid check-in payload/);
+});
+
+test('RLS/IDOR: B cannot read, update, delete or forge rows belonging to A', async () => {
+  const aCheckin = (await db.query(`select id from public.checkins where user_id='${A}' limit 1`)).rows[0].id;
+  // reads: B sees nothing of A's, even when asking by A's id
+  assert.equal((await as(B, () => db.query('select * from public.checkins where id = $1', [aCheckin]))).rows.length, 0);
+  assert.equal((await as(B, () => db.query('select * from public.checkin_meals where checkin_id = $1', [aCheckin]))).rows.length, 0);
+  assert.equal((await as(B, () => db.query('select * from public.profiles where id = $1', [A]))).rows.length, 0);
+  assert.equal((await as(B, () => db.query('select * from public.journeys where user_id = $1', [A]))).rows.length, 0);
+  // updates/deletes silently affect 0 rows
+  const upd = await as(B, () => db.query(`update public.checkins set water_ml = 0 where id = $1`, [aCheckin]));
+  assert.equal(upd.affectedRows, 0);
+  const del = await as(B, () => db.query(`delete from public.checkin_meals where checkin_id = $1`, [aCheckin]));
+  assert.equal(del.affectedRows, 0);
+  const upj = await as(B, () => db.query(`update public.journeys set water_goal_ml = 500 where user_id = $1`, [A]));
+  assert.equal(upj.affectedRows, 0);
+  const upp = await as(B, () => db.query(`update public.profiles set full_name = 'pwned' where id = $1`, [A]));
+  assert.equal(upp.affectedRows, 0);
+  await save(B, '2026-09-02', payload()); // B has a row of their own, so the reassignment below is a real attack
+  // forging: inserting rows as A, or re-assigning ownership, is rejected
+  await denied(as(B, () => db.query(`insert into public.checkins (user_id, checkin_date) values ('${A}', '2026-01-01')`)));
+  await denied(as(B, () => db.query(`insert into public.user_achievements values ('${A}', 'd7', '2026-09-01')`)));
+  await denied(as(B, () => db.query(`update public.checkins set user_id = '${A}' where user_id = '${B}'`)));
+  // A's data is untouched
+  assert.equal((await db.query(`select full_name from public.profiles where id='${A}'`)).rows[0].full_name, 'Alice');
+});
+
+test('IDOR via foreign key: B cannot attach a meal to A\'s check-in (composite FK)', async () => {
+  const aCheckin = (await db.query(`select id from public.checkins where user_id='${A}' limit 1`)).rows[0].id;
+  await as(B, async () => {
+    await assert.rejects(
+      db.query(`insert into public.checkin_meals (checkin_id, user_id, category, name, eaten_at) values ($1, '${B}', 'lunch', 'injected', '12:00')`, [aCheckin]),
+      /foreign key|violates/i,
+    );
+  });
+  assert.equal((await db.query(`select 1 from public.checkin_meals where name='injected'`)).rows.length, 0);
+});
+
+test('profiles: users cannot change email/id, insert or delete profiles', async () => {
+  await denied(as(A, () => db.query(`update public.profiles set email = 'carol@example.com' where id = '${A}'`)));
+  await denied(as(A, () => db.query(`insert into public.profiles (id) values (gen_random_uuid())`)));
+  await denied(as(A, () => db.query(`delete from public.profiles where id = '${A}'`)));
+  await denied(as(A, () => db.query(`delete from public.checkins`)));
+  await denied(as(A, () => db.query(`delete from public.journeys`)));
+});
+
+test('achievements: own rows only; unknown ids rejected', async () => {
+  await as(A, () => db.query(`insert into public.user_achievements values ('${A}', 'first', '2026-09-02')`));
+  assert.equal((await as(B, () => db.query('select * from public.user_achievements'))).rows.length, 0);
+  await assert.rejects(as(A, () => db.query(`insert into public.user_achievements values ('${A}', 'godmode', '2026-09-02')`)), /violates/);
+});
+
+// ---------- exercise unit (movement duration: minutes canonical + the unit the user entered) ----------
+test('exercise_unit: hours/minutes persist through save_checkin; a re-save updates (never duplicates); bad units rejected', async () => {
+  await save(A, '2026-09-10', payload({ exercise_type: 'Gym', exercise_minutes: 90, exercise_unit: 'hours' }));
+  let r = (await as(A, () => db.query(`select exercise_minutes, exercise_unit from public.checkins where checkin_date='2026-09-10'`))).rows;
+  assert.deepEqual(r, [{ exercise_minutes: 90, exercise_unit: 'hours' }]);
+  await save(A, '2026-09-10', payload({ exercise_type: 'Gym', exercise_minutes: 90, exercise_unit: 'minutes' }));
+  r = (await as(A, () => db.query(`select exercise_minutes, exercise_unit from public.checkins where checkin_date='2026-09-10'`))).rows;
+  assert.deepEqual(r, [{ exercise_minutes: 90, exercise_unit: 'minutes' }]); // same row, unit updated
+  await save(A, '2026-09-11', payload({ exercise_type: null, exercise_minutes: null })); // no unit sent -> default
+  assert.equal((await as(A, () => db.query(`select exercise_unit from public.checkins where checkin_date='2026-09-11'`))).rows[0].exercise_unit, 'minutes');
+  await assert.rejects(save(A, '2026-09-12', payload({ exercise_unit: 'days' })), /violates|check/i);
+});
+
+test('migration 2026-09-27_exercise_unit.sql is re-runnable and keeps save_checkin working', async () => {
+  const mig = readFileSync(new URL('../../supabase/migrations/2026-09-27_exercise_unit.sql', import.meta.url), 'utf8');
+  await db.exec(mig);
+  await db.exec(mig);
+  await save(A, '2026-09-13', payload({ exercise_minutes: 60, exercise_unit: 'hours' }));
+  assert.equal((await as(A, () => db.query(`select exercise_unit from public.checkins where checkin_date='2026-09-13'`))).rows[0].exercise_unit, 'hours');
+});

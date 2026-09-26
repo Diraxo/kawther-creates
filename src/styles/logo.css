@@ -1,0 +1,17 @@
+/* Kawther K mark — the tile inverts against the theme so the K is always crisp:
+   dark UI  -> white rounded tile, deep-emerald K
+   light UI -> deep-black rounded tile, glowing emerald K */
+.klogo{display:block; flex:none; position:relative; border-radius:22%; box-shadow:0 8px 26px rgba(34,197,139,.20);}
+.klogo img{width:100%; height:100%; display:block; border-radius:22%;}
+.klogo .kb{display:none;}
+:root[data-theme="light"] .klogo .kw{display:none;}
+:root[data-theme="light"] .klogo .kb{display:block;}
+:root[data-theme="light"] .klogo{box-shadow:0 8px 26px rgba(14,157,116,.22);}
+.klogo{aspect-ratio:1;}
+/* Fluid sizing: bounded by both viewport width and height so the mark never dominates a small phone. */
+.klogo--xl{width:clamp(64px,min(22vw,13vh),104px); margin:0 auto;}
+.klogo--md{width:clamp(48px,min(15vw,9vh),68px); margin:4px auto clamp(10px,2.4vh,18px);}
+.klogo--sm{width:clamp(26px,8vw,30px); border-radius:9px; box-shadow:none;}
+.klogo--sm img{border-radius:9px;}
+.brandtag{display:flex; align-items:center; gap:10px;}
+.brandtag em{font-style:normal;}

@@ -1,0 +1,36 @@
+.hero-landing{padding-top:clamp(8px,10vh,14vh); text-align:center;}
+.hero-landing h1{font-size:clamp(26px,8vw,34px); line-height:1.15; margin:clamp(16px,3.4vh,26px) 0 10px; text-wrap:balance; font-weight:500;}
+.hero-landing p{color:var(--sub); font-size:clamp(14px,3.8vw,15px); line-height:1.6; margin:0 0 clamp(22px,4vh,34px); text-wrap:balance;}
+.mark{width:56px; height:56px; border-radius:16px; background:linear-gradient(155deg,var(--emerald),var(--emerald-deep)); margin:0 auto; display:flex; align-items:center; justify-content:center; color:#fff; font-family:'Plus Jakarta Sans',sans-serif; font-size:24px;}
+
+.step-track{display:flex; gap:6px; margin-bottom:28px;}
+.step-track i{flex:1; height:3px; border-radius:3px; background:var(--line);}
+.step-track i.on{background:var(--emerald);}
+.stepnum{color:var(--sub); font-size:13px; margin-bottom:6px; letter-spacing:.03em;}
+
+/* Journey length picker */
+.dur-group{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-bottom:22px;}
+.dur-card{appearance:none; font:inherit; text-align:left; min-height:76px; padding:14px; border-radius:16px; border:1px solid var(--line); background:transparent; color:var(--sub); cursor:pointer; display:flex; flex-direction:column; gap:4px; min-width:0; transition:border-color .2s, background-color .2s, color .2s, box-shadow .2s;}
+.dur-card b{font-size:15px; font-weight:600; color:var(--ink);}
+.dur-card span{font-size:12.5px; line-height:1.35; overflow-wrap:anywhere;}
+.dur-card:focus-visible, .dur-step:focus-visible, .dur-custom-head:focus-visible{outline:2px solid var(--emerald); outline-offset:2px;}
+.dur-card.on{border-color:var(--emerald); background:var(--emerald-tint); box-shadow:0 0 0 1px var(--emerald) inset;}
+.dur-card.on b{color:var(--emerald);}
+.dur-custom{padding:0; grid-column:1 / -1; cursor:default;}
+.dur-custom-head{appearance:none; font:inherit; text-align:left; background:none; border:0; color:inherit; cursor:pointer; padding:14px; min-height:76px; display:flex; flex-direction:column; gap:4px; border-radius:16px;}
+.dur-custom-head b{font-size:15px; font-weight:600; color:var(--ink);}
+.dur-custom-head span{font-size:12.5px;}
+.dur-custom.on .dur-custom-head b{color:var(--emerald);}
+.dur-custom-body{padding:0 14px 14px; animation:durIn .22s ease both;}
+.dur-custom-body[hidden]{display:none;}
+.dur-label{display:block; font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--sub); margin-bottom:8px;}
+.dur-stepper{display:flex; align-items:center; gap:8px; min-width:0;}
+.dur-stepper input{flex:1 1 0; min-width:0; width:100%; height:48px; text-align:center; font-size:24px; font-weight:600; background:transparent; border:0; border-bottom:2px solid var(--line); border-radius:0; color:var(--emerald); padding:0; outline:none; transition:border-color .2s;}
+.dur-stepper input:focus{border-bottom-color:var(--emerald);}
+.dur-stepper input[aria-invalid="true"]{border-bottom-color:var(--danger);}
+.dur-unit{color:var(--sub); font-size:14px;}
+.dur-step{appearance:none; flex:none; width:48px; height:48px; border-radius:50%; border:1px solid var(--line); background:transparent; color:var(--emerald); font-size:22px; line-height:1; cursor:pointer; transition:background-color .2s, border-color .2s;}
+.dur-step:hover{background:var(--emerald-tint); border-color:var(--emerald);}
+@keyframes durIn{from{opacity:0; transform:translateY(-4px);}to{opacity:1; transform:none;}}
+@media (max-width:359px){.dur-group{grid-template-columns:minmax(0,1fr);} .dur-card{min-height:64px;} .dur-unit{display:none;} .dur-step{width:44px; height:44px;}}
+@media (prefers-reduced-motion:reduce){.dur-card,.dur-step,.dur-stepper input{transition:none;} .dur-custom-body{animation:none;}}

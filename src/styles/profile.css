@@ -1,0 +1,21 @@
+.topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;}
+.topbar h2{margin:0; font-size:20px;}
+.iconbtn{background:none; border:none; font-size:18px; color:var(--ink); cursor:pointer; min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center;}
+.empty{text-align:center; padding:30px 10px; color:var(--sub); font-size:13.5px;}
+.theme-row{display:flex; gap:8px; margin:10px 0 18px;}
+.theme-opt{flex:1; padding:12px; border-radius:14px; border:1px solid var(--line); text-align:center; font-size:13px; font-weight:600; cursor:pointer; color:var(--sub);}
+.theme-opt.on{border-color:var(--emerald); color:var(--emerald); background:var(--emerald-tint);}
+.profile-head{text-align:center; margin-bottom:20px;}
+.avatar{width:76px; height:76px; border-radius:50%; background:linear-gradient(155deg,var(--emerald),var(--emerald-deep)); color:#fff; display:flex; align-items:center; justify-content:center; font-family:'Plus Jakarta Sans',sans-serif; font-size:28px; margin:0 auto 12px;}
+.rowlink{display:flex; justify-content:space-between; align-items:center; padding:14px 0; border-bottom:1px solid var(--line); font-size:14.5px; cursor:pointer;}
+.rowlink:last-child{border-bottom:none;}
+.rowlink .sub{color:var(--sub); font-size:12.5px;}
+.notice{background:var(--emerald-tint); color:var(--emerald-deep); border-radius:12px; padding:10px 14px; font-size:12.5px; margin-bottom:16px;}
+svg text{font-family:'Inter',sans-serif;}
+:focus-visible{outline:2px solid var(--emerald); outline-offset:2px; border-radius:4px;}
+
+/* empty states (no fake data: intentional, calm, with one clear action) */
+.empty-card{text-align:center; padding:26px 20px;}
+.empty-card b{display:block; font-size:16px; margin-bottom:6px;}
+.empty-card p{color:var(--sub); font-size:13.5px; line-height:1.55; margin:0 0 16px;}
+.meal-empty{color:var(--sub); font-size:12.5px; padding:2px 0 8px; opacity:.8;}

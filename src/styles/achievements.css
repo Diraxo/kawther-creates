@@ -1,0 +1,8 @@
+.ach-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.ach{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px 12px; text-align:center;}
+.ach .ic{width:40px; height:40px; border-radius:12px; background:var(--emerald-tint); color:var(--emerald); display:flex; align-items:center; justify-content:center; margin:0 auto 10px;}
+.ach.locked .ic{background:var(--card2); color:var(--sub);}
+.ach .ic svg{width:20px; height:20px;}
+.ach h4{font-size:13px; margin:0 0 4px;}
+.ach p{font-size:11px; color:var(--sub); margin:0;}
+.ach.locked{opacity:.55;}

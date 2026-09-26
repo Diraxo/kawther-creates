@@ -1,0 +1,8 @@
+.bottomnav{position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:var(--card); border-top:1px solid var(--line); display:flex; justify-content:space-around; align-items:center; padding:10px 6px calc(10px + env(safe-area-inset-bottom,0px)); z-index:40;}
+@media(min-width:900px){.bottomnav{max-width:520px;}}
+.navbtn{background:none; border:none; color:var(--sub); font-size:10px; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; padding:4px 6px; min-width:44px;}
+.navbtn svg{width:21px; height:21px; stroke:currentColor; stroke-width:1.8; fill:none; stroke-linecap:round; stroke-linejoin:round;}
+.navbtn.on{color:var(--emerald);}
+.navbtn.on svg{filter:drop-shadow(0 0 5px var(--emerald-glow));}
+.navbtn.fab{background:var(--emerald); color:#04150F; width:50px; height:50px; border-radius:50%; margin-top:-26px; box-shadow:0 8px 20px -4px var(--emerald-glow); align-items:center; justify-content:center;}
+.navbtn.fab svg{width:24px; height:24px; stroke-width:2.2;}
