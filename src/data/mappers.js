@@ -15,12 +15,21 @@ export function journeyToRow(userId, j) {
 
 export function rowToJourney(r) {
   return {
+    completedOn: r.completed_on ?? null, // set once the next journey has started; a completed journey is never edited
     start: r.start_date,
     duration: r.duration_days,
     startWeight: Number(r.start_weight),
     goalWeight: Number(r.goal_weight),
     waterGoal: r.water_goal_ml,
+    // Set after the original goal is achieved (see domain/goal.js); null until she chooses.
+    postGoalMode: r.post_goal_mode ?? null,
+    nextGoal: r.next_goal_weight == null ? null : Number(r.next_goal_weight),
   };
+}
+
+/** Columns written by `setPostGoal`. `new_goal` carries a weight; the other modes clear it. */
+export function postGoalToRow(mode, nextGoal) {
+  return { post_goal_mode: mode, next_goal_weight: mode === 'new_goal' ? nextGoal : null };
 }
 
 /** One check-in -> the checkins row plus its meal rows (checkin_id is added by the caller). */
@@ -109,10 +118,25 @@ export function rowsToCheckins(checkinRows, mealRows) {
   return out;
 }
 
-export function rowsToAchievements(rows) {
+/** Achievements that belong to ONE journey: an unlock dated before the current journey began is history, not current. */
+export const JOURNEY_SCOPED = ['goal', 'journey'];
+
+/** Picks the active journey (and the completed ones, oldest first) out of a user's journey rows. */
+export function splitJourneys(rows) {
+  const all = [...rows].sort((a, b) => (a.start_date < b.start_date ? -1 : a.start_date > b.start_date ? 1 : 0)).map(rowToJourney);
+  return { journey: all.find((j) => !j.completedOn) || null, past: all.filter((j) => j.completedOn) };
+}
+
+/** Arguments for the `start_next_journey` RPC. `mode` is the chapter kind chosen on the Journey Complete screen. */
+export function nextJourneyToRpcArgs(j, mode) {
+  return { ...journeyToRpcArgs(j), p_mode: mode };
+}
+
+export function rowsToAchievements(rows, journey = null) {
   const unlocked = [];
   const unlockedDates = {};
   rows.forEach((r) => {
+    if (journey && JOURNEY_SCOPED.includes(r.achievement_id) && r.unlocked_on < journey.start) return;
     unlocked.push(r.achievement_id);
     unlockedDates[r.achievement_id] = r.unlocked_on;
   });

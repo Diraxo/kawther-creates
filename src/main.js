@@ -15,6 +15,8 @@ import './styles/checkin-refinements.css';
 import './styles/journey-detail.css';
 import './styles/feedback.css';
 import './styles/polish.css';
+import './styles/goal.css';
+import './styles/complete.css';
 
 import { state } from './state.js';
 import { $ } from './lib/dom.js';
@@ -26,6 +28,8 @@ import { closeOverlay } from './ui/overlays.js';
 import { confirmLogout, doLogin, doLogout, doSignup } from './screens/auth.js';
 import { finishOnboarding, obStep2, obStep3, obStep4, onDurInput, pickDur, stepDur } from './screens/onboarding.js';
 import { enterHome, openRenew } from './screens/home.js';
+import { chooseGoalMode, goalNext, showGoalExperience, goalSkip, onNewGoalSubmit, replayGoal } from './ui/goalExperience.js';
+import { journeyCompleteBack, journeyCompleteNext, onJourneyFormSubmit, pickChapter, showJourneyComplete } from './ui/journeyComplete.js';
 import {
   addMeal, adjWater, askDeleteMeal, confirmMeal, deleteMealFromModal, doDeleteMeal, editMeal,
   onWaterInput, openCheckin, openGoalEdit, pickMood, renderMeals, saveCheckin, saveGoal, setExUnit, setExercise,
@@ -48,6 +52,16 @@ const actions = {
   'confirm-logout': confirmLogout,
   'open-password': openPassword,
   'open-renew': openRenew,
+  'celebrate-again': replayGoal,
+  'goal-choose': (el) => chooseGoalMode(el.dataset.mode),
+  'change-goal-focus': () => showGoalExperience({ choicesOnly: true }),
+  'reached-next': goalNext,
+  'reached-skip': goalSkip,
+  'reached-choose': (el) => chooseGoalMode(el.dataset.mode),
+  'journey-complete-open': () => showJourneyComplete(),
+  'journey-complete-next': journeyCompleteNext,
+  'journey-complete-back': journeyCompleteBack,
+  'chapter-choose': (el) => pickChapter(el.dataset.kind),
   'continue-journey': () => { closeOverlay('ov-renew'); openCheckin(); },
   'set-ex-unit': (el) => setExUnit(el.dataset.unit),
   'apply-custom-range': applyCustomRange,
@@ -95,6 +109,8 @@ document.addEventListener('input', (e) => {
 });
 document.addEventListener('submit', (e) => {
   if (e.target.id === 'pw-form') savePassword(e);
+  else if (e.target.id === 'rc-newgoal') onNewGoalSubmit(e);
+  else if (e.target.id === 'jc-form') onJourneyFormSubmit(e);
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.id === 'p-custom-days') { e.preventDefault(); applyCustomRange(); }

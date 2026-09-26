@@ -8,6 +8,8 @@
 //   changePassword(current, next)   verifies `current` with Supabase Auth, then updates the password
 //   createJourney(journey)          marks the user onboarded
 //   updateWaterGoal(ml)
+//   startNextJourney(journey, mode) archives the completed journey and starts the next (mode: continue|new_goal|maintain|journal)
+//   setPostGoal(mode, nextGoal)     after the original goal is achieved: 'new_goal' | 'maintain' | 'journal'
 //   saveCheckin(date, checkin)
 //   unlockAchievement(id, date)
 // A "user" is { name, email, onboarded, journey, checkins, unlocked, unlockedDates }.

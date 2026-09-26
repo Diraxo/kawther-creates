@@ -46,7 +46,7 @@ test('journey + achievement mappers', () => {
   const j = { start: '2026-09-02', duration: 90, startWeight: 72, goalWeight: 62, waterGoal: 2500 };
   const row = journeyToRow('u', j);
   assert.equal(row.water_goal_ml, 2500);
-  assert.deepEqual(rowToJourney({ ...row, start_weight: '72.0', goal_weight: '62.0' }), j);
+  assert.deepEqual(rowToJourney({ ...row, start_weight: '72.0', goal_weight: '62.0' }), { ...j, postGoalMode: null, nextGoal: null, completedOn: null });
   assert.deepEqual(rowsToAchievements([{ achievement_id: 'd3', unlocked_on: '2026-09-05' }]), {
     unlocked: ['d3'],
     unlockedDates: { d3: '2026-09-05' },

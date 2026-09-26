@@ -4,18 +4,24 @@ import { ARROW_SVG } from '../lib/icons.js';
 import { state } from '../state.js';
 import { formatDate, todayStr } from '../domain/dates.js';
 import {
-  currentDayIndex, goalDate, goalProgressPct, homeMotivation, latestWeight, waterGoalOf, weightDeltaText,
+  currentDayIndex, goalDate, homeMotivation, latestWeight, waterGoalOf, weightDeltaText,
 } from '../domain/journey.js';
 import { computeStreak } from '../domain/streak.js';
+import { activeTarget, goalAchievement, goalCopy, progressToward, postGoalSummary } from '../domain/goal.js';
 import { formatExercise, formatLitres, mealCount } from '../domain/checkin.js';
 import { capitalize, esc } from '../lib/format.js';
 import { showNav, tab } from '../ui/router.js';
 import { openOverlay } from '../ui/overlays.js';
+import { isJourneyEnded, journeyRecap, recapCopy } from '../domain/journeyComplete.js';
+import { maybeCelebrateJourneyComplete } from '../ui/journeyComplete.js';
+
+const CHOICES = [['new_goal', 'Set a new goal'], ['maintain', 'Maintain'], ['journal', 'Keep journaling']];
 
 export function enterHome() {
   showNav(true);
   tab('s-home');
   renderHome();
+  maybeCelebrateJourneyComplete();
 }
 
 /** The streak chip in the journey card's top-right corner (see domain/streak.js for the rules). */
@@ -84,6 +90,43 @@ export function openRenew() {
   openOverlay('ov-renew');
 }
 
+/** The permanent "Goal Achieved" card, and what she chose to focus on for the rest of the journey. */
+function renderGoalCard(user) {
+  const card = $('h-goalcard');
+  const a = user.unlocked.includes('goal') ? goalAchievement(user) : null;
+  card.hidden = !a;
+  if (!a) return;
+  const c = goalCopy(a);
+  $('h-gc-weight').textContent = c.weight;
+  $('h-gc-line').textContent = `You reached your goal on Day ${a.day}.`;
+  $('h-gc-early').textContent = c.earlyLine;
+  const next = $('h-gc-next');
+  if (c.remaining <= 0) { next.innerHTML = ''; return; }
+  const summary = postGoalSummary(user.journey);
+  next.innerHTML = summary
+    ? `<div class="gc-focus"><span>${esc(summary)}</span><button type="button" data-action="change-goal-focus">Change focus</button></div>`
+    : `<h4>Your ${a.duration}-day journey continues</h4><p>What would you like to focus on next?</p>
+       <div class="gc-choices">${CHOICES.map(([m, t]) => `<button type="button" data-action="goal-choose" data-mode="${m}">${t}</button>`).join('')}</div>`;
+}
+
+/** The permanent "Journey Complete" card: shown from the journey's last day until she starts the next journey. */
+function renderJourneyCard(user, today) {
+  const card = $('h-journeycard');
+  const ended = isJourneyEnded(user.journey, today);
+  card.hidden = !ended;
+  if (!ended) return;
+  const c = recapCopy(journeyRecap(user));
+  $('h-jc-title').textContent = c.headline;
+  $('h-jc-line').textContent = c.lines[0];
+}
+
+/** "JOURNEY 2 · DAY 3 OF 90", or "JOURNEY 2 · BEGINS <date>" when the next journey starts tomorrow. */
+function dayLabel(user, day, dur, today) {
+  const n = (user.pastJourneys || []).length;
+  const prefix = n ? `JOURNEY ${n + 1} · ` : '';
+  return user.journey.start > today ? `${prefix}BEGINS ${formatDate(user.journey.start).toUpperCase()}` : `${prefix}DAY ${day} OF ${dur}`;
+}
+
 export function renderHome() {
   const { user } = state;
   const today = todayStr();
@@ -92,7 +135,7 @@ export function renderHome() {
   $('h-greet').textContent = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
   const day = currentDayIndex(user.journey, today);
   const dur = user.journey.duration;
-  $('h-daylabel').textContent = `DAY ${day} OF ${dur}`;
+  $('h-daylabel').textContent = dayLabel(user, day, dur, today);
   $('h-goaldate').textContent = `Goal date · ${formatDate(goalDate(user.journey))}`;
   animateNum($('h-daynum'), day, 0, 600);
   const circ = 264;
@@ -105,10 +148,14 @@ export function renderHome() {
   const w = latestWeight(user);
   $('h-weight').textContent = w.toFixed(1) + ' kg';
   $('h-delta').textContent = weightDeltaText(user.journey.startWeight, w);
-  $('h-goal').textContent = user.journey.goalWeight + ' kg';
-  const pct = goalProgressPct(user.journey, w);
+  const target = activeTarget(user.journey);
+  $('h-goal-label').textContent = target.label;
+  $('h-goal').textContent = target.to + ' kg';
+  const pct = progressToward(target.from, target.to, w);
   animateNum($('h-pct'), pct, 0, 900, '%');
   setTimeout(() => { $('h-track').style.width = pct + '%'; }, REDUCE ? 0 : 80);
   $('h-motiv').textContent = homeMotivation(day, dur, streak.current, pct, !!user.checkins[today]);
+  renderGoalCard(user);
+  renderJourneyCard(user, today);
   renderCheckinCard(user, today);
 }

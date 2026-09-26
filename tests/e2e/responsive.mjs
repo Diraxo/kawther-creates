@@ -17,8 +17,15 @@ const PORT = 5177;
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--port', String(PORT), '--strictPort'], {
   env: { ...process.env, VITE_SUPABASE_URL: URL_, VITE_SUPABASE_ANON_KEY: KEY }, stdio: 'ignore',
 });
-await new Promise((r) => setTimeout(r, 4500));
 const BASE = `http://localhost:${PORT}`;
+// Wait until Vite actually serves index.html (with the splash) and main.js compiles, instead of guessing with a fixed sleep.
+for (let i = 0; ; i++) {
+  const ok = await Promise.all([fetch(BASE).then((r) => r.text()), fetch(BASE + '/src/main.js').then((r) => r.ok)])
+    .then(([html, js]) => js && html.includes('id="splash"'), () => false);
+  if (ok) break;
+  if (i > 120) throw new Error('vite dev server did not become ready');
+  await new Promise((r) => setTimeout(r, 250));
+}
 
 const SIZES = process.env.QUICK ? [[320, 640], [1280, 800]] : [[320, 640], [360, 740], [375, 667], [390, 844], [414, 896], [430, 932], [768, 1024], [1024, 768], [1280, 800], [1440, 900], [1920, 1080]];
 const SHOT_W = [320, 390, 768, 1280];

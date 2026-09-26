@@ -188,3 +188,74 @@ test('migration 2026-09-27_exercise_unit.sql is re-runnable and keeps save_check
   await save(A, '2026-09-13', payload({ exercise_minutes: 60, exercise_unit: 'hours' }));
   assert.equal((await as(A, () => db.query(`select exercise_unit from public.checkins where checkin_date='2026-09-13'`))).rows[0].exercise_unit, 'hours');
 });
+
+// ---------- goal achievement ----------
+test('goal achievement: post-goal choice is constrained, user-scoped, reset by create_journey; goal achievement allowed', async () => {
+  await as(CAROL, () => db.query(`select public.create_journey('2026-09-01'::date, 60, 48, 65, 2500)`));
+  const set = (mode, w) => as(CAROL, () => db.query(`update public.journeys set post_goal_mode=$1, next_goal_weight=$2 where user_id=$3`, [mode, w, CAROL]));
+  await set('new_goal', 68);
+  await set('maintain', null);
+  await set('journal', null);
+  await assert.rejects(set('new_goal', null), /violates|check/i);
+  await assert.rejects(set('maintain', 70), /violates|check/i);
+  await assert.rejects(set('sprint', null), /violates|check/i);
+  await assert.rejects(set('new_goal', 500), /violates|check/i);
+  const other = await as(B, () => db.query(`update public.journeys set post_goal_mode='maintain' where user_id=$1`, [CAROL]));
+  assert.equal(other.affectedRows, 0);
+  await as(CAROL, () => db.query(`insert into public.user_achievements values ($1, 'goal', '2026-09-30')`, [CAROL]));
+  await assert.rejects(as(CAROL, () => db.query(`insert into public.user_achievements values ($1, 'bogus', '2026-09-30')`, [CAROL])), /violates|check/i);
+  await set('new_goal', 68);
+  await as(CAROL, () => db.query(`select public.create_journey('2026-10-01'::date, 30, 60, 70, 2500)`));
+  const r = (await as(CAROL, () => db.query(`select post_goal_mode, next_goal_weight from public.journeys where user_id=$1`, [CAROL]))).rows[0];
+  assert.deepEqual(r, { post_goal_mode: null, next_goal_weight: null });
+});
+
+test('migration 2026-09-28_goal_achievement.sql is re-runnable on top of the schema', async () => {
+  const mig = readFileSync(new URL('../../supabase/migrations/2026-09-28_goal_achievement.sql', import.meta.url), 'utf8');
+  await db.exec(mig);
+  await db.exec(mig);
+  await as(CAROL, () => db.query(`update public.journeys set post_goal_mode='maintain', next_goal_weight=null where user_id=$1 and completed_on is null`, [CAROL]));
+  await assert.rejects(as(CAROL, () => db.query(`update public.journeys set post_goal_mode='new_goal' where user_id=$1 and completed_on is null`, [CAROL])), /violates|check/i);
+});
+
+// ---------- journey complete ----------
+const DAVE = '44444444-4444-4444-4444-444444444444';
+
+test('journey complete: start_next_journey archives the finished journey, keeps it immutable, one active at a time', async () => {
+  await db.exec(`insert into auth.users values ('${DAVE}', 'dave@example.com', '{"full_name":"Dave"}')`);
+  const q = (sql, args) => as(DAVE, () => db.query(sql, args));
+  await q(`select public.create_journey('2020-01-01'::date, 60, 48, 65, 2500)`); // last day 2020-02-29
+  const next = (start, mode = 'new_goal', goal = 62) => q(`select public.start_next_journey($1::date, 90, 65, $2, 2500, $3)`, [start, goal, mode]);
+  await assert.rejects(next('2020-02-29'), /after the previous one ends/);
+  await assert.rejects(next('2020-03-01', 'sprint'), /invalid mode/);
+  await next('2020-03-01');
+  const rows = (await q(`select start_date::text as s, completed_on::text as c, goal_weight::float as g, post_goal_mode as m from public.journeys where user_id=$1 order by start_date`, [DAVE])).rows;
+  assert.deepEqual(rows, [{ s: '2020-01-01', c: '2020-02-29', g: 65, m: null }, { s: '2020-03-01', c: null, g: 62, m: null }]);
+  // the finished journey cannot be edited, and a second active journey cannot exist
+  const upd = await q(`update public.journeys set goal_weight = 90 where user_id=$1 and completed_on is not null`, [DAVE]);
+  assert.equal(upd.affectedRows, 0);
+  await assert.rejects(q(`insert into public.journeys (user_id, start_date, duration_days, start_weight, goal_weight) values ($1,'2021-01-01',30,60,60)`, [DAVE]), /unique|duplicate/i);
+  // onboarding's create_journey only ever touches the ACTIVE journey
+  await q(`select public.create_journey('2020-03-02'::date, 30, 65, 66, 2500)`);
+  const after = (await q(`select start_date::text as s, duration_days as d from public.journeys where user_id=$1 order by start_date`, [DAVE])).rows;
+  assert.deepEqual(after, [{ s: '2020-01-01', d: 60 }, { s: '2020-03-02', d: 30 }]);
+});
+
+test('journey complete: cannot start the next journey before the last day, and other users cannot touch it', async () => {
+  const CAT = '55555555-5555-5555-5555-555555555555';
+  await db.exec(`insert into auth.users values ('${CAT}', 'cat@example.com', '{"full_name":"Cat"}')`);
+  await as(CAT, () => db.query(`select public.create_journey(current_date, 60, 48, 65, 2500)`));
+  await assert.rejects(as(CAT, () => db.query(`select public.start_next_journey(current_date + 60, 30, 48, 50, 2500, 'journal')`)), /not complete yet/);
+  await as(CAT, () => db.query(`insert into public.user_achievements values ($1, 'journey', current_date)`, [CAT]));
+  const EVE = '66666666-6666-6666-6666-666666666666'; // no journey at all
+  await db.exec(`insert into auth.users values ('${EVE}', 'eve@example.com', '{"full_name":"Eve"}')`);
+  await assert.rejects(as(EVE, () => db.query(`select public.start_next_journey(current_date + 60, 30, 48, 50, 2500, 'journal')`)), /no active journey/);
+});
+
+test('migration 2026-09-29_journey_complete.sql is re-runnable on the pre-migration shape', async () => {
+  const mig = readFileSync(new URL('../../supabase/migrations/2026-09-29_journey_complete.sql', import.meta.url), 'utf8');
+  await db.exec(mig);
+  await db.exec(mig);
+  const CAT = '55555555-5555-5555-5555-555555555555';
+  assert.equal((await as(CAT, () => db.query(`select count(*)::int as n from public.journeys`))).rows[0].n, 1);
+});

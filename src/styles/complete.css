@@ -1,0 +1,27 @@
+/* Journey Complete: reuses the always-dark .rc celebration shell from goal.css; only the recap layout is new. */
+.rcj{justify-content:flex-start; padding-top:72px;}
+.rcj .rc-crown{width:92px; height:92px;}
+.rcj .rc-crown .ic{width:44px; height:44px;}
+.rcj .rc-title{font-size:clamp(26px,8vw,40px); text-align:center;}
+.rcj .rc-title--sm{font-size:clamp(24px,7vw,32px);}
+.rcj .rc-you{margin-top:20px; animation-delay:.5s;}
+.rcj .rc-title{animation-delay:.8s;}
+.rcj .rc-sub, .rcj .rc-sub2{animation-delay:.2s; opacity:1; animation:none;}
+.rcj .rc-sub2{margin-top:22px; font-size:15px;}
+.rcj-lines{margin-top:16px; display:flex; flex-direction:column; gap:6px; font-size:16px; line-height:1.5; color:#DDE3DF; opacity:0; animation:rcUp .7s ease 1.2s forwards;}
+.rcj-lines p{margin:0;}
+.rcj-weights{width:100%; margin-top:22px; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; opacity:0; animation:rcUp .7s ease 1.6s forwards;}
+.rcj-weights div, .rcj-stats div{display:flex; flex-direction:column; gap:4px; padding:12px 6px; border-radius:14px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);}
+.rcj-weights b, .rcj-stats b{font-size:20px; font-weight:700; font-variant-numeric:tabular-nums;}
+.rcj-weights span, .rcj-stats span{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--rc-sub);}
+.rcj-stats{width:100%; margin-top:10px; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; opacity:0; animation:rcUp .7s ease 2s forwards;}
+.rcj-note{margin:20px 0 0; padding:0 8px; font-family:'Playfair Display',serif; font-style:italic; font-size:16px; line-height:1.5; color:var(--rc-sub); opacity:0; animation:rcUp .7s ease 2.4s forwards;}
+.rcj-note[hidden]{display:none;}
+.rcj-note cite{display:block; margin-top:6px; font:600 12px 'Inter',sans-serif; font-style:normal; letter-spacing:.08em;}
+.rcj .rc-next{animation-delay:1.4s;}
+.rcj .rc-newgoal{margin-top:18px;}
+.rcj .rc-newgoal #jc-goalfield{display:flex; flex-direction:column; gap:10px;}
+.rcj .rc-newgoal #jc-goalfield[hidden]{display:none;}
+.journeycard .btn{margin-top:14px;}
+.overlay.still .rcj-lines, .overlay.still .rcj-weights, .overlay.still .rcj-stats, .overlay.still .rcj-note{opacity:1 !important; animation:none !important;}
+@media (prefers-reduced-motion:reduce){ .rcj-lines, .rcj-weights, .rcj-stats, .rcj-note{opacity:1 !important; animation:none !important;} }

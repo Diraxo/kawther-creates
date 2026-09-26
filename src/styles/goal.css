@@ -1,0 +1,136 @@
+/* Goal Achievement: the full-screen experience, the Home goal card, timeline marker, profile badge, trophy card.
+   The experience is always dark (black + emerald + gold) whatever the app theme, so the moment looks the same. */
+
+/* ---------- full-screen experience ---------- */
+.overlay.reached{padding:0; background:#030504; z-index:130; align-items:stretch; justify-content:stretch;}
+.rc{position:relative; width:100%; min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:64px 24px calc(28px + env(safe-area-inset-bottom)); color:#F3F5F3; text-align:center; overflow:hidden; outline:none;
+  --rc-em:#22C58B; --rc-gold:#D8B767; --rc-sub:#9BA6A1;}
+.rc-glow{position:absolute; left:50%; top:42%; width:130vmax; height:130vmax; transform:translate(-50%,-50%); pointer-events:none;
+  background:radial-gradient(closest-side, rgba(34,197,139,.30), rgba(34,197,139,.10) 40%, transparent 70%); opacity:0; animation:rcGlow 2.6s ease-out .2s forwards, rcBreathe 6s ease-in-out 3s infinite;}
+@keyframes rcGlow{to{opacity:1;}}
+@keyframes rcBreathe{0%,100%{transform:translate(-50%,-50%) scale(1);} 50%{transform:translate(-50%,-50%) scale(1.06);}}
+.rc[data-phase="trophy"] .rc-glow{background:radial-gradient(closest-side, rgba(216,183,103,.26), rgba(34,197,139,.10) 45%, transparent 70%);}
+.rc-sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
+.rc-phase{position:relative; width:100%; max-width:440px; display:flex; flex-direction:column; align-items:center; z-index:1;}
+.rc-phase[hidden]{display:none;}
+.rc-skip{position:absolute; top:calc(16px + env(safe-area-inset-top)); right:18px; z-index:2; background:none; border:0; color:var(--rc-sub); font:600 13px 'Inter',sans-serif; padding:10px 12px; cursor:pointer; border-radius:10px;}
+.rc-skip:hover{color:#fff;}
+.rc-skip[hidden]{display:none;}
+
+/* 1 - recognition */
+.rc-big{display:flex; align-items:baseline; justify-content:center; gap:8px; font-family:'Playfair Display',serif; font-variant-numeric:tabular-nums; opacity:0; transform:scale(.86); animation:rcBig 1s cubic-bezier(.2,.8,.2,1) .5s forwards;}
+.rc-big span{font-size:clamp(76px,24vw,124px); font-weight:600; line-height:1; letter-spacing:-.02em; text-shadow:0 0 60px rgba(34,197,139,.45);}
+.rc-big small{font:600 clamp(18px,5vw,26px) 'Inter',sans-serif; color:var(--rc-em);}
+@keyframes rcBig{to{opacity:1; transform:none;}}
+.rc-l1{margin-top:26px; font-weight:800; letter-spacing:.32em; font-size:clamp(15px,4.4vw,20px); color:var(--rc-em); opacity:0; animation:rcUp .8s ease 2.5s forwards;}
+.rc-l2{margin-top:14px; font-weight:700; letter-spacing:.22em; font-size:clamp(12px,3.4vw,14px); color:var(--rc-gold); opacity:0; animation:rcUp .8s ease 3.6s forwards;}
+@keyframes rcUp{from{opacity:0; transform:translateY(12px);} to{opacity:1; transform:none;}}
+
+/* 2 - recap */
+.rc-range{font-family:'Playfair Display',serif; font-size:clamp(34px,10vw,52px); font-weight:600; font-variant-numeric:tabular-nums; opacity:0; animation:rcUp .8s ease .1s forwards;}
+.rc-bar{width:100%; height:8px; border-radius:99px; background:rgba(255,255,255,.1); margin:26px 0 30px; overflow:hidden; opacity:0; animation:rcUp .6s ease .5s forwards;}
+.rc-bar i{display:block; height:100%; width:0; border-radius:99px; background:linear-gradient(90deg,var(--rc-em),#7BE3B9); box-shadow:0 0 18px rgba(34,197,139,.6); animation:rcFill 2s cubic-bezier(.25,.8,.25,1) .8s forwards;}
+@keyframes rcFill{to{width:100%;}}
+.rc-stats{display:flex; gap:38px; justify-content:center;}
+.rc-stats div{display:flex; flex-direction:column; gap:4px; opacity:0; animation:rcUp .7s ease 2.4s forwards;}
+.rc-stats div + div{animation-delay:2.9s;}
+.rc-stats b{font-size:clamp(26px,8vw,34px); font-weight:700; font-variant-numeric:tabular-nums;}
+.rc-stats span{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--rc-sub);}
+.rc-pct{margin-top:22px; font-weight:600; font-size:15px; color:var(--rc-gold); opacity:0; animation:rcUp .7s ease 3.4s forwards;}
+.rc-quote{margin:26px 0 0; font-size:clamp(16px,4.6vw,19px); line-height:1.55; color:var(--rc-sub); opacity:0; animation:rcUp .9s ease 4.3s forwards;}
+.rc-quote b{color:#fff; font-weight:600;}
+
+/* 3 - trophy */
+.rc-crown{width:112px; height:112px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--rc-gold);
+  background:radial-gradient(circle at 50% 35%, rgba(216,183,103,.30), rgba(216,183,103,.06) 70%); border:1.5px solid rgba(216,183,103,.55);
+  box-shadow:0 0 70px rgba(216,183,103,.35), inset 0 0 30px rgba(216,183,103,.15); opacity:0; transform:translateY(-30px) scale(.8); animation:rcCrown 1s cubic-bezier(.2,.9,.3,1.2) .1s forwards;}
+.rc-crown .ic{width:54px; height:54px; stroke-width:1.5;}
+@keyframes rcCrown{to{opacity:1; transform:none;}}
+.rc-you{margin-top:28px; font-weight:800; letter-spacing:.18em; font-size:clamp(13px,3.8vw,15px); color:var(--rc-em); opacity:0; animation:rcUp .7s ease .8s forwards;}
+.rc-title{margin:14px 0 0; font-family:'Playfair Display',serif; font-weight:600; font-size:clamp(34px,10vw,50px); letter-spacing:.04em; line-height:1.1;
+  background:linear-gradient(180deg,#F5E2AE,#D8B767 60%,#B8923F); -webkit-background-clip:text; background-clip:text; color:transparent; opacity:0; animation:rcUp .8s ease 1.2s forwards;}
+.rc-title--sm{font-size:clamp(24px,7vw,32px); letter-spacing:0; background:none; color:#fff; -webkit-text-fill-color:#fff; opacity:1; animation:none;}
+.rc-sub{margin:18px 0 0; font-size:17px; font-weight:600; opacity:0; animation:rcUp .7s ease 1.8s forwards;}
+.rc-sub2{margin:8px 0 0; font-size:14.5px; color:var(--rc-sub); opacity:0; animation:rcUp .7s ease 2.2s forwards;}
+#rc-left{opacity:1; animation:none; color:var(--rc-sub); font-weight:500; font-size:15px; margin-top:10px;}
+
+/* 4 - choices */
+.rc-options{width:100%; display:flex; flex-direction:column; gap:10px; margin-top:26px;}
+.rc-options[hidden]{display:none;}
+.rc-opt{display:flex; flex-direction:column; gap:4px; text-align:left; width:100%; padding:16px 18px; border-radius:16px; cursor:pointer; color:#F3F5F3;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); font:inherit; transition:background .2s, border-color .2s, transform .15s;}
+.rc-opt:hover{background:rgba(34,197,139,.10); border-color:rgba(34,197,139,.55);}
+.rc-opt:active{transform:scale(.985);}
+.rc-opt b{font-size:16px;}
+.rc-opt span{font-size:13px; color:var(--rc-sub); line-height:1.4;}
+.rc-opt b span{font-size:inherit; color:inherit; line-height:inherit;}
+.rc-newgoal{width:100%; margin-top:26px; text-align:left; display:flex; flex-direction:column; gap:10px;}
+.rc-newgoal[hidden]{display:none;}
+.rc-newgoal label{font-size:13px; color:var(--rc-sub); font-weight:600;}
+.rc-newgoal input{width:100%; padding:16px; border-radius:14px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06); color:#fff; font-size:20px; font-weight:600; font-variant-numeric:tabular-nums;}
+.rc-newgoal input[aria-invalid="true"]{border-color:var(--danger);}
+.rc-err{min-height:18px; font-size:13px; color:#F19390;}
+
+.rc-foot{position:relative; z-index:1; width:100%; max-width:440px; margin-top:34px; display:flex; flex-direction:column; align-items:center; gap:6px;}
+.rc-next{opacity:0; animation:rcUp .6s ease .6s forwards;}
+.rc[data-phase="trophy"] .rc-next{animation-delay:2.6s;}
+.rc[data-phase="choices"] .rc-foot{margin-top:18px;}
+.rc-later{background:none; border:0; color:var(--rc-sub); font:600 14px 'Inter',sans-serif; padding:12px; cursor:pointer;}
+.rc-later[hidden], .rc-next[hidden]{display:none;}
+
+/* reduced motion: everything is simply there; the person moves on with Continue */
+.overlay.still .rc *, .overlay.still .rc-glow{animation:none !important; opacity:1 !important; transform:none !important;}
+.overlay.still .rc-glow{transform:translate(-50%,-50%) !important;}
+.overlay.still .rc-bar i{width:100% !important;}
+.overlay.still .rc-title{opacity:1 !important;}
+@media (prefers-reduced-motion:reduce){
+  .rc *, .rc-glow{animation:none !important; opacity:1 !important; transform:none !important;}
+  .rc-glow{transform:translate(-50%,-50%) !important;}
+  .rc-bar i{width:100% !important;}
+}
+@media (max-height:640px){ .rc{justify-content:flex-start; padding-top:72px;} .rc-crown{width:84px; height:84px;} .rc-crown .ic{width:40px; height:40px;} }
+
+/* ---------- Home goal card ---------- */
+.goalcard{position:relative; overflow:hidden; border-color:rgba(216,183,103,.5); background:linear-gradient(160deg, rgba(216,183,103,.10), var(--card) 55%); text-align:center;}
+.goalcard[hidden]{display:none;}
+.gc-eyebrow{display:inline-flex; align-items:center; gap:8px; color:var(--gold); font-weight:800; letter-spacing:.18em; font-size:12px;}
+.gc-eyebrow .ic{width:18px; height:18px; stroke:var(--gold); fill:none;}
+.gc-weight{margin-top:8px; font-family:'Playfair Display',serif; font-size:44px; font-weight:600; font-variant-numeric:tabular-nums;}
+.gc-line{margin:6px 0 0; font-size:14.5px;}
+.gc-early{margin:4px 0 0; color:var(--emerald); font-weight:700; font-size:13.5px;}
+.gc-again{margin-top:14px; background:none; border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:10px 16px; font:600 13.5px 'Inter',sans-serif; cursor:pointer;}
+.gc-again:hover{border-color:var(--gold);}
+.gc-next{margin-top:18px; padding-top:16px; border-top:1px solid var(--line); text-align:left;}
+.gc-next:empty{display:none;}
+.gc-next h4{margin:0 0 4px; font-size:15px;}
+.gc-next p{margin:0 0 12px; font-size:13.5px; color:var(--sub);}
+.gc-choices{display:grid; gap:8px;}
+.gc-choices button{padding:13px 14px; border-radius:13px; border:1px solid var(--line); background:var(--card2); color:var(--ink); font:600 14px 'Inter',sans-serif; text-align:left; cursor:pointer;}
+.gc-choices button:hover{border-color:var(--emerald);}
+.gc-focus{display:flex; justify-content:space-between; align-items:center; gap:10px; font-weight:600; font-size:14px;}
+.gc-focus button{background:none; border:0; color:var(--emerald); font:600 13px 'Inter',sans-serif; cursor:pointer; padding:6px;}
+
+/* ---------- Journey timeline marker ---------- */
+.cal-day.reached{background:var(--gold); color:#2A2005; border-color:var(--gold); font-weight:700; position:relative; box-shadow:0 0 0 2px rgba(216,183,103,.35);}
+.cal-day.reached .crown{position:absolute; top:-7px; right:-5px; width:15px; height:15px; color:var(--gold); background:var(--card); border-radius:50%; padding:1px; stroke:currentColor;}
+.cal-legend{margin-top:10px; font-size:12px; color:var(--sub); display:flex; gap:14px; flex-wrap:wrap;}
+.cal-legend .ic{width:13px; height:13px; stroke:var(--gold); vertical-align:-2px; margin-right:4px;}
+.daystatus.goal{color:var(--gold);}
+.daystatus.goal .ic{stroke:var(--gold); fill:none;}
+
+/* ---------- Profile badge ---------- */
+.goal-badge{display:flex; align-items:center; gap:12px; padding:14px 16px; border-radius:18px; margin-bottom:14px; border:1px solid rgba(216,183,103,.55); background:linear-gradient(160deg, rgba(216,183,103,.14), var(--card));}
+.goal-badge[hidden]{display:none;}
+.goal-badge .ic{width:26px; height:26px; flex:none; stroke:var(--gold); fill:none;}
+.goal-badge b{display:block; font-size:14.5px; color:var(--gold);}
+.goal-badge span{font-size:12.5px; color:var(--sub);}
+
+/* ---------- Achievements: the trophy ---------- */
+.ach.trophy{grid-column:1 / -1; padding:22px 16px; border-color:rgba(216,183,103,.55); background:linear-gradient(160deg, rgba(216,183,103,.14), var(--card));}
+.ach.trophy .ic{width:56px; height:56px; border-radius:50%; background:rgba(216,183,103,.16); color:var(--gold); box-shadow:0 0 26px rgba(216,183,103,.3);}
+.ach.trophy .ic svg{width:28px; height:28px;}
+.ach.trophy h4{font-size:15px; color:var(--gold);}
+.ach.trophy.locked{background:var(--card); border-color:var(--line); box-shadow:none;}
+.ach.trophy.locked .ic{background:var(--card2); color:var(--sub); box-shadow:none;}
+.ach.trophy.locked h4{color:inherit;}

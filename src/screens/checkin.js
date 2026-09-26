@@ -1,9 +1,13 @@
 import { $, $$ } from '../lib/dom.js';
+import { reducedMotion } from '../lib/motion.js';
 import { esc } from '../lib/format.js';
 import { CHECK_SVG, OPEN_SVG, TRASH_SVG } from '../lib/icons.js';
 import { toast } from '../lib/toast.js';
 import { reportDataError } from '../lib/dataError.js';
 import { celebrateAchievements } from '../ui/milestones.js';
+import { showGoalExperience } from '../ui/goalExperience.js';
+import { maybeCelebrateJourneyComplete } from '../ui/journeyComplete.js';
+import { goalAchievement } from '../domain/goal.js';
 import { state } from '../state.js';
 import { getRepo } from '../data/repository.js';
 import { todayStr } from '../domain/dates.js';
@@ -276,21 +280,28 @@ export async function saveCheckin() {
   if ((draft.water || 0) >= goal && prevWater < goal) setTimeout(() => toast('Hydration goal complete'), 700);
   await checkAchievements(d);
   renderHome();
+  maybeCelebrateJourneyComplete();
 }
 
 async function checkAchievements(today) {
   const { user } = state;
   const unlocked = [];
   for (const a of findNewUnlocks(user, today)) {
+    // The goal is recorded on the day the weight was actually reached (not necessarily today).
+    const on = a.id === 'goal' ? goalAchievement(user).date : today;
     try {
-      await getRepo().unlockAchievement(a.id, today);
+      await getRepo().unlockAchievement(a.id, on);
     } catch (e) {
       console.error(e);
       continue; // not persisted -> not celebrated; re-evaluated on the next save
     }
     user.unlocked.push(a.id);
-    user.unlockedDates[a.id] = today;
+    user.unlockedDates[a.id] = on;
     unlocked.push(a);
   }
-  celebrateAchievements(unlocked); // queued: shown one after another, in unlock order
+  const goalUnlocked = unlocked.find((a) => a.id === 'goal');
+  const ordinary = unlocked.filter((a) => a.id !== 'goal');
+  if (!goalUnlocked) { celebrateAchievements(ordinary); return; } // queued: shown one after another, in unlock order
+  // The Goal Achievement Experience takes the whole screen; the small unlocks wait until it closes.
+  setTimeout(() => showGoalExperience({ onClose: () => celebrateAchievements(ordinary) }), reducedMotion() ? 0 : 900);
 }

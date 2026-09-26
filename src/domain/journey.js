@@ -1,5 +1,6 @@
 // Journey / streak / motivation logic (pure — every function takes `today` explicitly).
 import { addDays, daysBetween } from './dates.js';
+import { progressToward } from './goal.js';
 
 export const DEFAULT_WATER_GOAL = 2500; // ml
 
@@ -58,10 +59,9 @@ export function consistencyPct(user, today) {
   return Math.round((inJourney / day) * 100);
 }
 
-/** Share of the start->goal distance covered, clamped 0..100. */
+/** Share of the start->goal distance covered, clamped 0..100 (works for gaining and losing alike). */
 export function goalProgressPct(journey, weight) {
-  const total = journey.startWeight - journey.goalWeight;
-  return total > 0 ? Math.max(0, Math.min(100, ((journey.startWeight - weight) / total) * 100)) : 0;
+  return progressToward(journey.startWeight, journey.goalWeight, weight);
 }
 
 export function weightDeltaText(startWeight, weight) {

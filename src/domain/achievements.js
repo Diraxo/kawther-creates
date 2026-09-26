@@ -5,11 +5,17 @@
 //   d3/d7/d14   the LONGEST run of consecutive check-in days (see streak.js `best`) reaches 3 / 7 / 14.
 //   hydrated    7 days on which the water logged met the user's hydration goal.
 //   active      4 check-ins with a logged workout inside any 7-day window.
+//   goal        a check-in weight reaches the user's own goal (either direction). Special: celebrated by the Goal
+//               Achievement Experience, not the small milestone card.
+//   journey     the journey's last day has arrived, goal reached or not. `manual`: celebrated by the Journey Complete
+//               screen (ui/journeyComplete.js), never by the small milestone card or the check-in flow.
 //   consistent  80%+ of the journey days so far have a check-in, AND at least 7 check-ins
 //               (80% of a single day is not consistency).
 import { daysBetween } from './dates.js';
-import { consistencyPct, waterGoalOf } from './journey.js';
+import { consistencyPct, goalProgressPct, latestWeight, waterGoalOf } from './journey.js';
 import { computeStreak } from './streak.js';
+import { goalAchievement } from './goal.js';
+import { isJourneyEnded } from './journeyComplete.js';
 
 export const CONSISTENT_MIN_CHECKINS = 7;
 
@@ -38,6 +44,9 @@ export function achievementContext(user, today) {
     hydratedDays: list.filter((c) => (c.water || 0) >= goal).length,
     maxWorkoutsInWeek: maxWorkoutsInWeek(user.checkins),
     consistency: consistencyPct(user, today),
+    goalReached: !!goalAchievement(user),
+    journeyEnded: isJourneyEnded(user.journey, today),
+    goalPct: Math.floor(goalProgressPct(user.journey, latestWeight(user))),
   };
 }
 
@@ -59,10 +68,14 @@ export const ACH_DEFS = [
     prog: (x) => (x.checkinCount < CONSISTENT_MIN_CHECKINS
       ? [x.checkinCount, CONSISTENT_MIN_CHECKINS]
       : [Math.min(80, x.consistency), 80]) },
+  { id: 'goal', ic: 'crown', special: true, t: 'Goal Achieved', d: 'Reach the goal weight you set. It cannot be unlocked any other way.',
+    test: (x) => x.goalReached, prog: (x) => [x.goalReached ? 100 : Math.min(99, x.goalPct || 0), 100] },
+  { id: 'journey', ic: 'trophy', special: true, manual: true, t: 'Journey Complete', d: 'Complete every day of a journey, whether or not the goal weight was reached.',
+    test: (x) => x.journeyEnded, prog: (x) => [x.journeyEnded ? 1 : 0, 1] },
 ];
 
 /** Definitions that now pass but aren't unlocked yet. */
 export function findNewUnlocks(user, today) {
   const ctx = achievementContext(user, today);
-  return ACH_DEFS.filter((a) => !user.unlocked.includes(a.id) && a.test(ctx));
+  return ACH_DEFS.filter((a) => !a.manual && !user.unlocked.includes(a.id) && a.test(ctx));
 }

@@ -5,6 +5,8 @@ import { CHECK_SVG } from '../lib/icons.js';
 import { state } from '../state.js';
 import { addDays, formatLongDate, parseDate, todayStr } from '../domain/dates.js';
 import { currentDayIndex, goalDate, waterGoalOf } from '../domain/journey.js';
+import { goalAchievement, goalCopy } from '../domain/goal.js';
+import { svgIcon } from '../lib/icons.js';
 import { dayStatusClass } from '../domain/metrics.js';
 import { formatExercise, formatLitres } from '../domain/checkin.js';
 
@@ -23,6 +25,7 @@ export function renderJourney() {
     cal.appendChild(e);
   }
   const goal = waterGoalOf(user.journey);
+  const reached = user.unlocked.includes('goal') ? goalAchievement(user) : null;
   for (let i = 0; i < dur; i++) {
     const dateStr = addDays(start, i);
     const isFuture = dateStr > today;
@@ -30,10 +33,13 @@ export function renderJourney() {
     let cls = 'cal-day ' + dayStatusClass(c, isFuture, goal);
     if (dateStr === today) cls += ' today';
     if (dateStr === goalDate(user.journey)) cls += ' goalday';
+    const isReached = !!reached && dateStr === reached.date;
+    if (isReached) cls += ' reached';
     const el = document.createElement('div');
     el.className = cls;
     el.textContent = i + 1;
-    el.setAttribute('aria-label', 'Day ' + (i + 1) + (c ? ', checked in' : isFuture ? ', upcoming' : ', missed'));
+    if (isReached) el.insertAdjacentHTML('beforeend', `<span class="crown">${svgIcon('crown')}</span>`);
+    el.setAttribute('aria-label', 'Day ' + (i + 1) + (isReached ? ', goal reached' : '') + (c ? ', checked in' : isFuture ? ', upcoming' : ', missed'));
     if (!isFuture) {
       el.tabIndex = 0;
       el.setAttribute('role', 'button');
@@ -44,6 +50,9 @@ export function renderJourney() {
     }
     cal.appendChild(el);
   }
+  const legend = $('j-legend');
+  legend.hidden = !reached;
+  if (reached) legend.innerHTML = `<span>${svgIcon('crown')}Goal reached · Day ${reached.day}</span><span>Ring · journey end</span>`;
   $('j-detail-inner').innerHTML = Object.keys(user.checkins).length
     ? '<div class="empty">Tap a day to see what you logged.</div>'
     : '<div class="empty">No check-ins yet. Your days will fill in here as you log them.</div>';
@@ -53,8 +62,9 @@ function card(label, value) {
   return `<div class="dcard"><span>${label}</span><b>${esc(value)}</b></div>`;
 }
 
-function dayDetailHtml(c, num, dLabel, goal) {
-  const head = `<h3 class="daytitle" id="j-detail-title" tabindex="-1">Day ${num} check-in</h3><div class="daypill">${esc(dLabel)}</div>`;
+function dayDetailHtml(c, num, dLabel, goal, goalDay) {
+  const goalNote = goalDay ? `<div class="daystatus goal">${svgIcon('crown')}${esc(goalDay)}</div>` : '';
+  const head = `<h3 class="daytitle" id="j-detail-title" tabindex="-1">Day ${num} check-in</h3><div class="daypill">${esc(dLabel)}</div>${goalNote}`;
   if (!c) return `${head}<div class="empty" style="padding:18px 0;">No check-in logged for this day.</div>`;
   const mealsAll = Object.values(c.meals || {}).flat();
   const mealsHtml = mealsAll.length
@@ -88,7 +98,9 @@ export function showDay(dateStr, num, el) {
     state.selectedDayEl = el;
   }
   const box = $('j-detail-inner');
-  box.innerHTML = dayDetailHtml(user.checkins[dateStr], num, formatLongDate(dateStr), waterGoalOf(user.journey));
+  const ga = user.unlocked.includes('goal') ? goalAchievement(user) : null;
+  const goalDay = ga && ga.date === dateStr ? `Goal reached · ${goalCopy(ga).weight}` : '';
+  box.innerHTML = dayDetailHtml(user.checkins[dateStr], num, formatLongDate(dateStr), waterGoalOf(user.journey), goalDay);
   box.classList.remove('swap');
   void box.offsetWidth;
   box.classList.add('swap');

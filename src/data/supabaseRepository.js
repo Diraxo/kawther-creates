@@ -5,7 +5,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { AuthError, classifyError } from './errors.js';
 import {
-  checkinToPayload, journeyToRpcArgs, rowToJourney, rowsToAchievements, rowsToCheckins,
+  checkinToPayload, journeyToRpcArgs, nextJourneyToRpcArgs, postGoalToRow, rowsToAchievements, rowsToCheckins, splitJourneys,
 } from './mappers.js';
 
 const PAGE = 1000; // PostgREST's default max rows per response
@@ -53,7 +53,7 @@ export class SupabaseRepository {
     try {
       res = await Promise.all([
         this.sb.from('profiles').select('*').eq('id', uid).maybeSingle(),
-        this.sb.from('journeys').select('*').eq('user_id', uid).maybeSingle(),
+        this.sb.from('journeys').select('*').eq('user_id', uid).order('start_date'),
         this.#all('checkins', uid),
         this.#all('checkin_meals', uid),
         this.sb.from('user_achievements').select('*').eq('user_id', uid),
@@ -63,15 +63,17 @@ export class SupabaseRepository {
     }
     const [profile, journey, checkins, meals, ach] = res;
     [profile, journey, ach].forEach((r) => fail(r.error));
+    const { journey: active, past } = splitJourneys(journey.data || []);
     // A signed-in user with no profile row means the signup trigger did not run. Never guess: fail loudly.
     if (!profile.data) throw new AuthError('UNKNOWN', 'Profile row missing (is the signup trigger installed?)');
     return {
       name: profile.data.full_name,
       email: authUser.email,
-      onboarded: !!(profile.data.onboarded && journey.data),
-      journey: journey.data ? rowToJourney(journey.data) : null,
+      onboarded: !!(profile.data.onboarded && active),
+      journey: active,
+      pastJourneys: past, // completed journeys: immutable history (Journey 1..N-1)
       checkins: rowsToCheckins(checkins, meals),
-      ...rowsToAchievements(ach.data),
+      ...rowsToAchievements(ach.data, active),
     };
   }
 
@@ -184,7 +186,24 @@ export class SupabaseRepository {
 
   async updateWaterGoal(ml) {
     const uid = await this.#userId();
-    const { data, error } = await this.sb.from('journeys').update({ water_goal_ml: ml }).eq('user_id', uid).select('id');
+    const { data, error } = await this.sb.from('journeys').update({ water_goal_ml: ml }).eq('user_id', uid).is('completed_on', null).select('id');
+    fail(error);
+    if (!data.length) throw new AuthError('FORBIDDEN', 'No journey to update');
+  }
+
+  /**
+   * Journey Complete -> "What's next": archives the finished journey and starts the next one in one transaction.
+   * `mode`: 'continue' | 'new_goal' | 'maintain' | 'journal'.
+   */
+  async startNextJourney(journey, mode) {
+    await this.#userId();
+    fail((await this.sb.rpc('start_next_journey', nextJourneyToRpcArgs(journey, mode))).error);
+  }
+
+  /** Records what she chose after achieving her goal: 'new_goal' (with a weight) | 'maintain' | 'journal'. */
+  async setPostGoal(mode, nextGoal = null) {
+    const uid = await this.#userId();
+    const { data, error } = await this.sb.from('journeys').update(postGoalToRow(mode, nextGoal)).eq('user_id', uid).is('completed_on', null).select('id');
     fail(error);
     if (!data.length) throw new AuthError('FORBIDDEN', 'No journey to update');
   }

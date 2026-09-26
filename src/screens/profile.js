@@ -2,6 +2,7 @@ import { $, $$ } from '../lib/dom.js';
 import { state } from '../state.js';
 import { formatDate } from '../domain/dates.js';
 import { goalDate } from '../domain/journey.js';
+import { goalAchievement, goalCopy, postGoalSummary } from '../domain/goal.js';
 import { go } from '../ui/router.js';
 import { getTheme } from '../ui/theme.js';
 
@@ -17,6 +18,12 @@ export function renderProfile() {
   $('pf-goalw').textContent = j.goalWeight + ' kg';
   $('pf-startd').textContent = formatDate(j.start);
   $('pf-goald').textContent = formatDate(goalDate(j)); // start date is Day 1, so the last day is start + (duration - 1)
+  const a = user.unlocked.includes('goal') ? goalAchievement(user) : null;
+  $('pf-badge').hidden = !a;
+  if (a) $('pf-badge-sub').textContent = goalCopy(a).badge;
+  const next = postGoalSummary(j);
+  $('pf-next-row').hidden = !next;
+  if (next) $('pf-next').textContent = next;
   const th = getTheme();
   $$('.theme-opt[data-t]').forEach((o) => o.classList.toggle('on', o.dataset.t === th));
 }

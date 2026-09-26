@@ -192,7 +192,7 @@ html{background:#060706;}
       </div>
     </div>
     <div class="goalbar">
-      <div class="lbl"><span>Goal: <span id="h-goal">—</span></span><span id="h-pct">0%</span></div>
+      <div class="lbl"><span><span id="h-goal-label">Goal</span>: <span id="h-goal">—</span></span><span id="h-pct">0%</span></div>
       <div class="track"><i id="h-track" style="width:0%"></i></div>
     </div>
     <div class="motiv" id="h-motiv">Your journey starts today.</div>
@@ -200,6 +200,20 @@ html{background:#060706;}
       <p id="h-renew-text">Your streak is paused.</p>
       <button type="button" class="renew-btn" data-action="open-renew"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path class="fl-out" d="M12 2s1 3.2-1.2 5.6C8.6 10 6 12 6 15.5a6 6 0 0 0 12 0c0-2.2-1-3.8-2.2-5.2-.3 1.4-1 2.2-1.9 2.6.4-3.6-.6-7.6-1.9-10.9z"/><path class="fl-in" d="M12 21a3.2 3.2 0 0 0 3.2-3.2c0-1.8-1.4-2.6-2.2-4-.4 1-1 1.4-1.6 2-.9.8-2.6 1.6-2.6 4A3.2 3.2 0 0 0 12 21z"/></svg>Renew your streak</button>
     </div>
+  </div>
+  <div class="card goalcard" id="h-goalcard" hidden>
+    <div class="gc-eyebrow"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5L3 8z"/><path d="M5 21h14"/></svg><span>GOAL ACHIEVED</span></div>
+    <div class="gc-weight" id="h-gc-weight">—</div>
+    <p class="gc-line" id="h-gc-line"></p>
+    <p class="gc-early" id="h-gc-early"></p>
+    <button type="button" class="gc-again" data-action="celebrate-again">Celebrate again</button>
+    <div class="gc-next" id="h-gc-next"></div>
+  </div>
+  <div class="card goalcard journeycard" id="h-journeycard" hidden>
+    <div class="gc-eyebrow"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3"/><path d="M12 13v4M8.5 20h7"/></svg><span>JOURNEY COMPLETE</span></div>
+    <div class="gc-weight" id="h-jc-title">—</div>
+    <p class="gc-line" id="h-jc-line"></p>
+    <button type="button" class="btn" data-action="journey-complete-open">View recap &amp; choose what&rsquo;s next</button>
   </div>
   <div class="card ci-card" id="h-checkin-card" role="button" tabindex="0" data-action="open-checkin">
     <span class="ci-eyebrow" id="h-ci-eyebrow">TODAY</span>
@@ -333,6 +347,7 @@ html{background:#060706;}
   <div class="card">
     <div class="cal-head"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
     <div class="cal-grid" id="j-cal"></div>
+    <div class="cal-legend" id="j-legend" hidden></div>
   </div>
   <div class="card" id="j-detail" aria-live="polite"><div id="j-detail-inner"><div class="empty">Tap a day to see what you logged.</div></div></div>
 </section>
@@ -352,10 +367,12 @@ html{background:#060706;}
     <div class="serif" style="font-size:19px;" id="pf-name">—</div>
     <div style="color:var(--sub); font-size:13px;" id="pf-email">—</div>
   </div>
+  <div class="goal-badge" id="pf-badge" hidden><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5L3 8z"/><path d="M5 21h14"/></svg><div><b>Goal Achieved</b><span id="pf-badge-sub"></span></div></div>
   <div class="card">
     <div class="rowlink static"><span>Journey length</span><span class="sub" id="pf-journey">—</span></div>
     <div class="rowlink static"><span>Starting weight</span><span class="sub" id="pf-startw">—</span></div>
     <div class="rowlink static"><span>Goal weight</span><span class="sub" id="pf-goalw">—</span></div>
+    <div class="rowlink static" id="pf-next-row" hidden><span>Next chapter</span><span class="sub" id="pf-next">—</span></div>
     <div class="rowlink static"><span>Start date <small>(Day 1)</small></span><span class="sub" id="pf-startd">—</span></div>
     <div class="rowlink static"><span>Goal date <small>(last day)</small></span><span class="sub" id="pf-goald">—</span></div>
   </div>
@@ -481,6 +498,96 @@ html{background:#060706;}
   <h2 class="serif" id="rn-title">Your journey is still yours.</h2>
   <p id="rn-sub">Ready to keep going?</p>
   <button class="btn" data-action="continue-journey" id="rn-continue">Continue journey</button>
+</div></div>
+
+<div class="overlay reached" id="ov-reached"><div class="rc" role="dialog" aria-modal="true" aria-label="Goal achieved" data-phase="recognition">
+  <div class="rc-glow" aria-hidden="true"></div>
+  <div class="rc-sr" id="rc-live" aria-live="polite"></div>
+  <button type="button" class="rc-skip" id="rc-skip" data-action="reached-skip">Skip</button>
+
+  <section class="rc-phase" data-phase="recognition" aria-hidden="true">
+    <div class="rc-big"><span id="rc-num">—</span><small>kg</small></div>
+    <div class="rc-l1">GOAL REACHED</div>
+    <div class="rc-l2" id="rc-early"></div>
+  </section>
+
+  <section class="rc-phase" data-phase="recap" hidden>
+    <div class="rc-range" id="rc-range"></div>
+    <div class="rc-bar" aria-hidden="true"><i></i></div>
+    <div class="rc-stats">
+      <div><b id="rc-change"></b><span id="rc-change-l"></span></div>
+      <div><b id="rc-days"></b><span>to get here</span></div>
+    </div>
+    <div class="rc-pct" id="rc-pct"></div>
+    <p class="rc-quote">You didn&rsquo;t just reach your goal.<br><b>You showed up for yourself.</b></p>
+  </section>
+
+  <section class="rc-phase" data-phase="trophy" hidden>
+    <div class="rc-crown"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5L3 8z"/><path d="M5 21h14"/></svg></div>
+    <div class="rc-you" id="rc-you"></div>
+    <h2 class="rc-title">GOAL ACHIEVED</h2>
+    <p class="rc-sub" id="rc-reached"></p>
+    <p class="rc-sub2" id="rc-trophy"></p>
+  </section>
+
+  <section class="rc-phase" data-phase="choices" hidden>
+    <h2 class="rc-title rc-title--sm">Your original goal is complete.</h2>
+    <p class="rc-sub" id="rc-left"></p>
+    <div class="rc-options" id="rc-options">
+      <button type="button" class="rc-opt" data-action="reached-choose" data-mode="new_goal"><b>Set a new goal</b><span>Choose a new target for the days that remain.</span></button>
+      <button type="button" class="rc-opt" data-action="reached-choose" data-mode="maintain"><b>Maintain <span id="rc-maintain-w"></span></b><span>Focus on consistency and holding your achievement.</span></button>
+      <button type="button" class="rc-opt" data-action="reached-choose" data-mode="journal"><b>Keep journaling</b><span>No weight goal. Meals, hydration, movement, mood and habits.</span></button>
+    </div>
+    <form class="rc-newgoal" id="rc-newgoal" hidden novalidate>
+      <label for="rc-newgoal-input">New goal weight (kg)</label>
+      <input id="rc-newgoal-input" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 68" aria-describedby="rc-newgoal-err">
+      <div class="rc-err" id="rc-newgoal-err" role="alert"></div>
+      <button type="submit" class="btn" id="rc-newgoal-save">Set this goal</button>
+    </form>
+  </section>
+
+  <div class="rc-foot">
+    <button type="button" class="btn rc-next" id="rc-next" data-action="reached-next">Continue</button>
+    <button type="button" class="rc-later" id="rc-later" data-action="close-overlay" data-target="ov-reached" hidden>Decide later</button>
+  </div>
+</div></div>
+
+<div class="overlay reached" id="ov-complete"><div class="rc rcj" role="dialog" aria-modal="true" aria-label="Journey complete" data-phase="recap">
+  <div class="rc-glow" aria-hidden="true"></div>
+  <div class="rc-sr" id="jc-live" aria-live="polite"></div>
+
+  <section class="rc-phase" data-phase="recap">
+    <div class="rc-crown"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3"/><path d="M12 13v4M8.5 20h7"/></svg></div>
+    <div class="rc-you" id="jc-eyebrow">JOURNEY COMPLETE</div>
+    <h2 class="rc-title" id="jc-title"></h2>
+    <div class="rcj-lines" id="jc-lines"></div>
+    <div class="rcj-weights" id="jc-weights"></div>
+    <div class="rcj-stats" id="jc-stats"></div>
+    <blockquote class="rcj-note" id="jc-note" hidden></blockquote>
+    <p class="rc-sub2" id="jc-closing"></p>
+  </section>
+
+  <section class="rc-phase" data-phase="next" hidden>
+    <h2 class="rc-title rc-title--sm">What&rsquo;s next?</h2>
+    <p class="rc-sub" id="jc-next-sub">Your finished journey stays in your history exactly as it is.</p>
+    <div class="rc-options" id="jc-options"></div>
+    <form class="rc-newgoal" id="jc-form" hidden novalidate>
+      <div id="jc-goalfield">
+        <label for="jc-goal">New goal weight (kg)</label>
+        <input id="jc-goal" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 62" aria-describedby="jc-err">
+      </div>
+      <label for="jc-days">Journey length (days)</label>
+      <input id="jc-days" type="text" inputmode="numeric" autocomplete="off" aria-describedby="jc-err">
+      <div class="rc-err" id="jc-err" role="alert"></div>
+      <button type="submit" class="btn" id="jc-submit">Begin next journey</button>
+      <button type="button" class="rc-later" data-action="journey-complete-back">Back</button>
+    </form>
+  </section>
+
+  <div class="rc-foot">
+    <button type="button" class="btn rc-next" id="jc-next" data-action="journey-complete-next">Choose what&rsquo;s next</button>
+    <button type="button" class="rc-later" id="jc-later" data-action="close-overlay" data-target="ov-complete">Decide later</button>
+  </div>
 </div></div>
 
 <script type="module" src="/src/main.js"></script>
