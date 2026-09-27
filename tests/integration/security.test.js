@@ -306,13 +306,13 @@ test('validation: meal fields (category, name 1-200, notes <=1000, time HH:MM, p
   ]) await s(day(0), { meals: m(o) }, ok);
 });
 
-test('validation: mood, exercise (type <=60, minutes 0-1440, both-or-neither, unit)', async () => {
+test('validation: mood, exercise (type <=60, minutes 0-1440, minutes need a type, duration optional, unit)', async () => {
   const s = await saver();
   for (const [o, ok] of [
     [{ mood: 'great' }, true], [{ mood: null }, true], [{ mood: 'ecstatic' }, false], [{ mood: 5 }, false],
     [{ exercise_type: 'x'.repeat(60) }, true], [{ exercise_type: 'x'.repeat(61) }, false],
     [{ exercise_minutes: 0 }, true], [{ exercise_minutes: 1440 }, true], [{ exercise_minutes: 1441 }, false], [{ exercise_minutes: -1 }, false], [{ exercise_minutes: 1.5 }, false],
-    [{ exercise_type: null, exercise_minutes: 30 }, false], [{ exercise_type: 'Gym', exercise_minutes: null }, false], [{ exercise_type: null, exercise_minutes: null }, true],
+    [{ exercise_type: null, exercise_minutes: 30 }, false], [{ exercise_type: 'Gym', exercise_minutes: null }, true], [{ exercise_type: null, exercise_minutes: null }, true],
     [{ exercise_unit: 'hours' }, true], [{ exercise_unit: 'days' }, false], [{ exercise_unit: 3 }, false],
   ]) await s(day(0), o, ok);
 });

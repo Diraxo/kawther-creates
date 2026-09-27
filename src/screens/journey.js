@@ -8,7 +8,8 @@ import { currentDayIndex, goalDate, waterGoalOf } from '../domain/journey.js';
 import { goalAchievement, goalCopy } from '../domain/goal.js';
 import { svgIcon } from '../lib/icons.js';
 import { dayStatusClass } from '../domain/metrics.js';
-import { formatExercise, formatLitres } from '../domain/checkin.js';
+import { formatLitres } from '../domain/checkin.js';
+import { movementHtml } from '../lib/movementView.js';
 
 export function renderJourney() {
   const { user } = state;
@@ -76,8 +77,8 @@ function dayDetailHtml(c, num, dLabel, goal, goalDay) {
       ${card('Weight', c.weight ? `${c.weight.toFixed(1)} kg` : 'Not logged')}
       ${card('Hydration', `${formatLitres(c.water || 0)} / ${formatLitres(goal)}`)}
       ${card('Mood', c.mood ? capitalize(c.mood) : 'Not logged')}
-      ${card('Movement', c.exercise ? formatExercise(c.exercise) : 'Rest day')}
     </div>
+    <div class="detail-sec"><h5>Movement</h5>${movementHtml(c.exercise)}</div>
     <div class="detail-sec"><h5>Meals</h5>${mealsHtml}</div>
     <div class="detail-sec"><h5>Notes</h5>${c.notes ? `<p>${esc(c.notes)}</p>` : '<p class="muted">No notes</p>'}</div>`;
 }

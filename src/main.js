@@ -17,6 +17,7 @@ import './styles/feedback.css';
 import './styles/polish.css';
 import './styles/goal.css';
 import './styles/complete.css';
+import './styles/movement.css';
 
 import { state } from './state.js';
 import { $ } from './lib/dom.js';
@@ -34,7 +35,8 @@ import { chooseGoalMode, goalNext, showGoalExperience, goalSkip, onNewGoalSubmit
 import { journeyCompleteBack, journeyCompleteNext, onJourneyFormSubmit, pickChapter, showJourneyComplete } from './ui/journeyComplete.js';
 import {
   addMeal, adjWater, askDeleteMeal, confirmMeal, deleteMealFromModal, doDeleteMeal, editMeal,
-  onWaterInput, openCheckin, openGoalEdit, pickMood, renderMeals, saveCheckin, saveGoal, setExUnit, setExercise,
+  onWaterInput, openCheckin, openGoalEdit, pickMood, renderMeals, saveCheckin, saveGoal, setExercise,
+  pickMovementType, toggleMuscle, toggleOtherMuscle, addCustomMuscle, onMovementKeydown,
 } from './screens/checkin.js';
 import { applyCustomRange, renderProgress, setRange } from './screens/progress.js';
 import { renderJourney, showDay } from './screens/journey.js';
@@ -74,7 +76,10 @@ const actions = {
   'journey-complete-back': journeyCompleteBack,
   'chapter-choose': (el) => pickChapter(el.dataset.kind),
   'continue-journey': () => { closeOverlay('ov-renew'); openCheckin(); },
-  'set-ex-unit': (el) => setExUnit(el.dataset.unit),
+  'pick-move': (el) => pickMovementType(el.dataset.type),
+  'toggle-muscle': (el) => toggleMuscle(el.dataset.muscle),
+  'toggle-other-muscle': toggleOtherMuscle,
+  'add-muscle': addCustomMuscle,
   'apply-custom-range': applyCustomRange,
   'do-share': doShare,
   'save-share-image': saveShareImage,
@@ -125,6 +130,7 @@ document.addEventListener('submit', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.id === 'p-custom-days') { e.preventDefault(); applyCustomRange(); }
+  onMovementKeydown(e);
 });
 
 document.addEventListener('click', (e) => {

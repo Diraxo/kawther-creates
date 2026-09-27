@@ -93,15 +93,15 @@ check('unauthenticated (anon key only) reads nothing', (await count(anon.from('c
 check('unauthenticated cannot call save_checkin', (await anon.rpc('save_checkin', { p_date: today, p_checkin: {} })).error !== null);
 const still = await a2.getSession();
 check("A's data is completely intact after all of B's attacks", still.checkins[today].water === 3200 && Object.keys(still.checkins).length === 3 && still.unlocked.length === 2);
-console.log('\nMovement duration unit + one-row-per-day');
+console.log('\nMovement journal + one-row-per-day');
 const notVerified = [];
-const { error: unitErr } = await a2.sb.from('checkins').select('exercise_unit').limit(1);
-await a2.saveCheckin(today, ci({ exercise: { type: 'Gym', duration: 90, unit: 'hours' } }));
+const { error: moveErr } = await a2.sb.from('checkins').select('exercise_steps').limit(1);
+await a2.saveCheckin(today, ci({ exercise: { type: 'Gym', duration: 90, muscles: ['Chest', 'Biceps'] } }));
 s = await a2.getSession();
-check('re-saving today updates the same row (still 2 check-ins, none duplicated)', Object.keys(s.checkins).length === 2);
+check('re-saving today updates the same row (still 3 check-ins, none duplicated)', Object.keys(s.checkins).length === 3);
 check('duration is never lost (90 minutes stored)', s.checkins[today].exercise.duration === 90);
-if (unitErr) notVerified.push('exercise_unit round trip (hours) - column missing: run supabase/migrations/2026-09-27_exercise_unit.sql');
-else check('unit "hours" round-trips through Supabase', s.checkins[today].exercise.unit === 'hours');
+if (moveErr) notVerified.push('movement detail round trip (muscle groups) - columns missing: run supabase/migrations/2026-10-01_movement_journal.sql after the hardening');
+else check('gym muscle groups round-trip through Supabase', s.checkins[today].exercise.muscles.join() === 'Chest,Biceps');
 
 console.log('\nChange password (real Supabase Auth)');
 const NEW_PASS = 'Changed-pass-67890';
@@ -111,7 +111,7 @@ check('rejected change left the old password working', await (async () => { cons
 await a2.changePassword(pass, NEW_PASS);
 check('after a valid change the NEW password signs in', await (async () => { const t = mk(); try { await t.signIn(emailA, NEW_PASS); await t.sb.auth.signOut({ scope: 'local' }); return true; } catch { return false; } })());
 check('...and the OLD password no longer works', await rejectsWith(mk().signIn(emailA, pass), 'INVALID_CREDENTIALS'));
-check('the active session survives the change (data still readable)', Object.keys((await a2.getSession()).checkins).length === 2);
+check('the active session survives the change (data still readable)', Object.keys((await a2.getSession()).checkins).length === 3);
 check('changing to the same password is reported (SAME_PASSWORD)', await rejectsWith(a2.changePassword(NEW_PASS, NEW_PASS), 'SAME_PASSWORD'));
 await a2.signOut();
 await b.signOut();

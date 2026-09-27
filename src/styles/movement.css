@@ -1,0 +1,57 @@
+/* Movement journal: the check-in movement form, the Home summary detail and the Journey day entry.
+   Nothing here depends on an animation to be visible. */
+.mv-rest{margin:2px 0 0; padding:12px 14px; border-radius:14px; background:var(--card2); display:flex; flex-direction:column; gap:2px;}
+.mv-rest b{font-family:'Plus Jakarta Sans',sans-serif; font-size:14px;}
+.mv-rest span{font-size:13px; color:var(--sub);}
+.mv-rest[hidden],#ci-ex-detail[hidden],#ci-ex-fields[hidden],.mv-field[hidden],.mv-other[hidden]{display:none;}
+
+.mv-group{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;}
+.mv-chip{min-height:44px; padding:0 10px; border-radius:14px; border:1px solid var(--line); background:var(--card2); color:var(--sub); font:600 13.5px 'Inter',sans-serif; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px; text-align:center; transition:background .2s,border-color .2s,color .2s; -webkit-appearance:none; appearance:none;}
+.mv-chip.on{border-color:var(--emerald); background:var(--emerald-tint); color:var(--emerald);}
+/* Selection is never colour alone: a selected chip also gets a check mark and a heavier border. */
+.mv-chip[aria-checked="true"]{border-width:2px; padding:0 9px;}
+.mv-chip[aria-checked="true"]::before{content:"✓"; font-weight:800; font-size:12px;}
+.mv-chip.custom::before{content:none;}
+.mv-chip:focus-visible,.mv-add:focus-visible,.mv-num input:focus-visible{outline:2px solid var(--emerald); outline-offset:2px;}
+.mv-chip.ghost{border-style:dashed; background:transparent;}
+.mv-chip.sm{min-height:40px; padding:0 12px; font-size:13px; border-radius:999px;}
+.mv-chip.sm[aria-checked="true"]{padding:0 11px;}
+#ci-ex-type + .err{margin-top:8px;}
+
+.mv-field{margin-top:16px;}
+.mv-q{display:block; font-size:13px; color:var(--ink); font-weight:600; margin:0 0 8px;}
+.mv-q em{font-style:normal; font-weight:500; color:var(--sub); font-size:12px; margin-left:4px;}
+.mv-dur{display:flex; gap:10px;}
+.mv-num{flex:1 1 0; min-width:0; display:flex; align-items:center; gap:8px; min-height:48px; padding:0 14px; border-radius:14px; border:1px solid var(--line); background:var(--card); color:var(--sub); font-size:13.5px;}
+.mv-num.wide{width:100%; flex:none;}
+.mv-num:focus-within{border-color:var(--emerald);}
+.mv-num input{flex:1; min-width:0; width:100%; padding:12px 0; border:none; background:transparent; color:var(--ink); font-size:16px; outline:none;}
+.mv-num input[aria-invalid="true"]{color:var(--danger);}
+.mv-chips{display:flex; flex-wrap:wrap; gap:8px;}
+.mv-custom{display:contents;}
+.mv-other{display:flex; gap:8px; margin-top:10px;}
+.mv-other input{flex:1; min-width:0; min-height:46px; padding:0 14px; border-radius:14px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:16px; outline:none;}
+.mv-other input:focus{border-color:var(--emerald);}
+.mv-add{min-height:46px; padding:0 18px; border-radius:14px; border:1px solid var(--emerald); background:var(--emerald-tint); color:var(--emerald); font-weight:700; font-size:14px; cursor:pointer;}
+#ci-ex-desc{width:100%; padding:12px 14px; border-radius:14px; border:1px solid var(--line); background:var(--card); color:var(--ink); font:16px 'Inter',sans-serif; resize:none; outline:none;}
+#ci-ex-desc:focus{border-color:var(--emerald);}
+#ci-ex-desc[aria-invalid="true"]{border-color:var(--danger);}
+
+/* Home summary: the concise detail line under the movement value */
+.ci-sum-item small{display:block; margin-top:2px; font-size:12px; color:var(--sub); overflow-wrap:anywhere;}
+
+/* Journey day detail */
+.mv-entry{display:flex; align-items:flex-start; gap:12px; padding:14px; border-radius:16px; background:var(--card2); border:1px solid var(--line);}
+.mv-entry .mv-ic{flex:0 0 40px; width:40px; height:40px; border-radius:12px; display:grid; place-items:center; background:var(--emerald-tint); color:var(--emerald);}
+.mv-entry .mv-ic svg{width:22px; height:22px;}
+.mv-entry > div{min-width:0;}
+.mv-kind{display:block; font-family:'Plus Jakarta Sans',sans-serif; font-size:13px; letter-spacing:.08em; color:var(--emerald);}
+.mv-entry p{margin:3px 0 0; font-size:14.5px; overflow-wrap:anywhere;}
+.detail-sec .mv-entry p.dim,.mv-entry p.dim{color:var(--sub); font-size:12.5px;}
+.mv-entry.rest .mv-kind{letter-spacing:.06em;}
+.mv-entry.rest p{color:var(--sub); font-size:13.5px;}
+
+@media(max-width:360px){
+  .mv-group{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .mv-chip{font-size:13px; padding:0 6px;}
+}

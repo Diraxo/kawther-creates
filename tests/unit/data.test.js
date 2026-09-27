@@ -13,7 +13,7 @@ const FIXTURE_CHECKIN = {
     dinner: [{ name: 'Rice and fish', notes: '', time: '7:15 PM' }],
     snacks: [{ name: 'Fruit', notes: '', time: '4:00 PM' }],
   },
-  exercise: { type: 'Walking', duration: 30, unit: 'minutes' }, notes: 'ok',
+  exercise: { type: 'Walking', duration: 30, muscles: [], distance: null, steps: 6420, description: '' }, notes: 'ok',
 };
 
 test('mappers round-trip a check-in through rows (Supabase shape)', () => {

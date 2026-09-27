@@ -280,20 +280,48 @@ html{background:#060706;}
       <div class="choice-card" id="ci-ex-yes" tabindex="0" role="button" data-action="set-exercise" data-yes="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11M4 8l4-4 3 3-4 4-3-3zm9 9l4-4 3 3-4 4-3-3zM9 15l6-6"/></svg><span>I moved today</span></div>
       <div class="choice-card on" id="ci-ex-no" tabindex="0" role="button" data-action="set-exercise" data-yes="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg><span>Rest day</span></div>
     </div>
-    <div id="ci-ex-detail" style="display:none;">
-      <div class="field"><label for="ci-ex-type">Workout type</label>
-        <select id="ci-ex-type"><option>Walking</option><option>Running</option><option>Gym</option><option>Home workout</option><option>Other</option></select>
+    <p class="mv-rest" id="ci-ex-rest"><b>Rest day</b><span>Recovery is part of the journey.</span></p>
+    <div id="ci-ex-detail" hidden>
+      <div class="mv-group" role="radiogroup" aria-label="Type of movement" id="ci-ex-type">
+        <button type="button" class="mv-chip" role="radio" aria-checked="false" data-action="pick-move" data-type="Gym">Gym</button><button type="button" class="mv-chip" role="radio" aria-checked="false" data-action="pick-move" data-type="Running">Running</button><button type="button" class="mv-chip" role="radio" aria-checked="false" data-action="pick-move" data-type="Walking">Walking</button><button type="button" class="mv-chip" role="radio" aria-checked="false" data-action="pick-move" data-type="Home workout">Home Workout</button><button type="button" class="mv-chip" role="radio" aria-checked="false" data-action="pick-move" data-type="Other">Other</button>
       </div>
-      <div class="field" style="margin-bottom:0;">
-        <label for="ci-ex-dur">Duration</label>
-        <div class="dur-row">
-          <input id="ci-ex-dur" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 30" aria-describedby="e-ci-ex-dur">
-          <div class="unit-toggle" role="radiogroup" aria-label="Duration unit">
-            <button type="button" role="radio" aria-checked="true" class="on" id="ci-ex-unit-minutes" data-action="set-ex-unit" data-unit="minutes">Minutes</button>
-            <button type="button" role="radio" aria-checked="false" id="ci-ex-unit-hours" data-action="set-ex-unit" data-unit="hours">Hours</button>
+      <div class="err" id="e-ci-ex-type" role="alert"></div>
+      <div id="ci-ex-fields" hidden>
+        <div class="mv-field">
+          <div class="mv-q" id="ci-ex-dur-q">How long?</div>
+          <div class="mv-dur" role="group" aria-labelledby="ci-ex-dur-q">
+            <label class="mv-num"><input id="ci-ex-hours" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="2" placeholder="0" aria-label="Hours" aria-describedby="e-ci-ex-dur"><span>hr</span></label>
+            <label class="mv-num"><input id="ci-ex-mins" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="3" placeholder="0" aria-label="Minutes" aria-describedby="e-ci-ex-dur"><span>min</span></label>
+          </div>
+          <div class="err" id="e-ci-ex-dur" role="alert"></div>
+        </div>
+        <div class="mv-field" id="ci-ex-f-gym" hidden>
+          <div class="mv-q" id="ci-ex-muscle-q">What did you train? <em>Optional</em></div>
+          <div class="mv-chips" id="ci-ex-muscles" role="group" aria-labelledby="ci-ex-muscle-q">
+            <button type="button" class="mv-chip sm" role="checkbox" aria-checked="false" data-action="toggle-muscle" data-muscle="Chest">Chest</button><button type="button" class="mv-chip sm" role="checkbox" aria-checked="false" data-action="toggle-muscle" data-muscle="Back">Back</button><button type="button" class="mv-chip sm" role="checkbox" aria-checked="false" data-action="toggle-muscle" data-muscle="Shoulders">Shoulders</button><button type="button" class="mv-chip sm" role="checkbox" aria-checked="false" data-action="toggle-muscle" data-muscle="Biceps">Biceps</button><button type="button" class="mv-chip sm" role="checkbox" aria-checked="false" data-action="toggle-muscle" data-muscle="Triceps">Triceps</button><button type="button" class="mv-chip sm" role="checkbox" aria-checked="false" data-action="toggle-muscle" data-muscle="Legs">Legs</button><button type="button" class="mv-chip sm" role="checkbox" aria-checked="false" data-action="toggle-muscle" data-muscle="Glutes">Glutes</button><button type="button" class="mv-chip sm" role="checkbox" aria-checked="false" data-action="toggle-muscle" data-muscle="Core">Core</button><button type="button" class="mv-chip sm" role="checkbox" aria-checked="false" data-action="toggle-muscle" data-muscle="Full Body">Full Body</button>
+            <span id="ci-ex-custom-chips" class="mv-custom"></span>
+            <button type="button" class="mv-chip sm ghost" id="ci-ex-other-btn" aria-expanded="false" aria-controls="ci-ex-other-row" data-action="toggle-other-muscle">+ Other</button>
+          </div>
+          <div class="mv-other" id="ci-ex-other-row" hidden>
+            <input id="ci-ex-other" type="text" maxlength="40" autocomplete="off" aria-label="Another muscle group" placeholder="e.g. Forearms">
+            <button type="button" class="mv-add" data-action="add-muscle">Add</button>
           </div>
         </div>
-        <div class="err" id="e-ci-ex-dur" role="alert"></div>
+        <div class="mv-field" id="ci-ex-f-run" hidden>
+          <label class="mv-q" for="ci-ex-distance">How far did you run? <em>Optional</em></label>
+          <label class="mv-num wide"><input id="ci-ex-distance" type="text" inputmode="decimal" autocomplete="off" maxlength="7" placeholder="e.g. 3.1" aria-describedby="e-ci-ex-distance"><span>miles</span></label>
+          <div class="err" id="e-ci-ex-distance" role="alert"></div>
+        </div>
+        <div class="mv-field" id="ci-ex-f-walk" hidden>
+          <label class="mv-q" for="ci-ex-steps">How many steps? <em>Optional</em></label>
+          <label class="mv-num wide"><input id="ci-ex-steps" type="text" inputmode="numeric" pattern="[0-9,]*" autocomplete="off" maxlength="9" placeholder="e.g. 6,420" aria-describedby="e-ci-ex-steps"><span>steps</span></label>
+          <div class="err" id="e-ci-ex-steps" role="alert"></div>
+        </div>
+        <div class="mv-field" id="ci-ex-f-desc" hidden>
+          <label class="mv-q" for="ci-ex-desc" id="ci-ex-desc-q">What did you do? <em>Optional</em></label>
+          <textarea id="ci-ex-desc" rows="2" maxlength="500" placeholder="Describe what you did..." aria-describedby="e-ci-ex-desc"></textarea>
+          <div class="err" id="e-ci-ex-desc" role="alert"></div>
+        </div>
       </div>
     </div>
   </div>

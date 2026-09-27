@@ -1,7 +1,8 @@
 // Check-in shape and helpers (pure).
+import { formatExercise } from './movement.js';
+
 export const MEAL_CATEGORIES = ['breakfast', 'lunch', 'dinner', 'snacks'];
 export const MOODS = ['great', 'good', 'okay', 'tired', 'low'];
-export const WORKOUT_TYPES = ['Walking', 'Running', 'Gym', 'Home workout', 'Other'];
 
 export function emptyCheckin() {
   return {
@@ -44,41 +45,8 @@ export function nowTimeLabel() {
   return to12(nowTimeValue());
 }
 
-// ---------- movement duration ----------
-// Stored canonically as WHOLE MINUTES (exercise_minutes) plus the unit the user chose (exercise_unit), so the entry
-// is shown back exactly as typed: "1 hr" stays "1 hr", "90 min" stays "90 min", "1.5 hr" stays "1.5 hr".
-export const EXERCISE_UNITS = ['minutes', 'hours'];
-export const MAX_EXERCISE_MINUTES = 1440;
-
-/** Validates typed text for the given unit. Hours may be decimal (up to 2 places). -> { ok, minutes } | { ok:false, error } */
-export function parseExerciseDuration(raw, unit) {
-  const s = String(raw ?? '').trim().replace(',', '.');
-  if (s === '') return { ok: false, error: 'Enter how long you moved.' };
-  if (unit === 'hours') {
-    if (!/^\d+(\.\d{1,2})?$/.test(s)) return { ok: false, error: 'Use hours like 1 or 1.5.' };
-  } else if (!/^\d+$/.test(s)) return { ok: false, error: 'Use whole minutes.' };
-  const minutes = Math.round(Number(s) * (unit === 'hours' ? 60 : 1));
-  if (minutes < 1) return { ok: false, error: 'Duration must be more than zero.' };
-  if (minutes > MAX_EXERCISE_MINUTES) return { ok: false, error: 'That is more than 24 hours.' };
-  return { ok: true, minutes };
-}
-
-/** The number to put back in the input when editing (in the entry's own unit). */
-export function durationInputValue(ex) {
-  if (!ex) return '';
-  return ex.unit === 'hours' ? String(Number((ex.duration / 60).toFixed(2))) : String(ex.duration);
-}
-
-/** Human display in the entry's own unit: "30 min", "90 min", "1 hr", "1.5 hr". */
-export function formatExerciseDuration(ex) {
-  if (!ex) return '';
-  return ex.unit === 'hours' ? `${durationInputValue(ex)} hr` : `${ex.duration} min`;
-}
-
-/** "Walking · 30 min" */
-export function formatExercise(ex) {
-  return ex ? `${ex.type} · ${formatExerciseDuration(ex)}` : '';
-}
+// Movement (type, optional duration + details) lives in ./movement.js; formatExercise is re-exported for existing callers.
+export { formatExercise };
 
 /** Litres for display: 1.5 -> "1.5 L", 5 -> "5 L", 2.25 -> "2.25 L" (goal/amount, never rounded to misleading precision). */
 export function formatLitres(ml) {

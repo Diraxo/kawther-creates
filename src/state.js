@@ -13,8 +13,9 @@ export const state = {
   onboarding: { start: null, goal: null, duration: 90, custom: false },
   /** Progress view: { kind:'days', days:N } | { kind:'all' } (independent of the journey length). */
   progressRange: { kind: 'days', days: 30 },
-  /** Unit selected in the check-in duration control. */
-  exUnit: 'minutes',
+  /** Check-in movement form: the chosen movement type (null = none yet) and the selected muscle groups (Gym). */
+  exType: null,
+  exMuscles: [],
   /** True while the check-in form edits today's already-saved check-in. */
   editingExisting: false,
   meal: { category: null, index: null },

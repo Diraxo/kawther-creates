@@ -1,6 +1,7 @@
 // Domain <-> Supabase row mapping. Pure functions, unit-tested; the Supabase
 // repository is just I/O around these. Column names match supabase/schema.sql.
 import { MEAL_CATEGORIES, to12, to24 } from '../domain/checkin.js';
+import { normalizeExercise } from '../domain/movement.js';
 
 export function journeyToRow(userId, j) {
   return {
@@ -47,6 +48,8 @@ export function checkinToRows(userId, date, c) {
       });
     });
   });
+  // One canonical movement: details that do not belong to the chosen type are never written.
+  const ex = normalizeExercise(c.exercise);
   return {
     checkin: {
       user_id: userId,
@@ -54,9 +57,13 @@ export function checkinToRows(userId, date, c) {
       mood: c.mood || null,
       weight_kg: c.weight ?? null,
       water_ml: c.water || 0,
-      exercise_type: c.exercise ? c.exercise.type : null,
-      exercise_minutes: c.exercise ? c.exercise.duration : null,
-      exercise_unit: c.exercise ? c.exercise.unit || 'minutes' : 'minutes',
+      exercise_type: ex ? ex.type : null,
+      exercise_minutes: ex ? ex.duration : null,
+      exercise_unit: 'minutes', // legacy column: the duration is shown normalised ("1 hr 10 min"), minutes stay canonical
+      exercise_muscles: ex ? ex.muscles : [],
+      exercise_distance_mi: ex ? ex.distance : null,
+      exercise_steps: ex ? ex.steps : null,
+      exercise_description: ex ? ex.description : '',
       notes: c.notes || '',
     },
     meals,
@@ -73,6 +80,10 @@ export function checkinToPayload(c) {
     exercise_type: checkin.exercise_type,
     exercise_minutes: checkin.exercise_minutes,
     exercise_unit: checkin.exercise_unit,
+    exercise_muscles: checkin.exercise_muscles,
+    exercise_distance_mi: checkin.exercise_distance_mi,
+    exercise_steps: checkin.exercise_steps,
+    exercise_description: checkin.exercise_description,
     notes: checkin.notes,
     meals: meals.map(({ category, name, notes, eaten_at, position }) => ({ category, name, notes, eaten_at, position })),
   };
@@ -109,9 +120,11 @@ export function rowsToCheckins(checkinRows, mealRows) {
       weight: r.weight_kg == null ? null : Number(r.weight_kg),
       water: r.water_ml,
       meals,
-      exercise: r.exercise_type
-        ? { type: r.exercise_type, duration: r.exercise_minutes || 0, unit: r.exercise_unit === 'hours' ? 'hours' : 'minutes' }
-        : null,
+      // Rows saved before the movement journal have only a type + minutes: the details come back as "not recorded".
+      exercise: normalizeExercise({
+        type: r.exercise_type, duration: r.exercise_minutes, muscles: r.exercise_muscles, distance: r.exercise_distance_mi,
+        steps: r.exercise_steps, description: r.exercise_description,
+      }),
       notes: r.notes || '',
     };
   });

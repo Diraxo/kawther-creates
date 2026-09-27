@@ -6,13 +6,12 @@ import { addDays, daysBetween, formatDate } from '../../src/domain/dates.js';
 import { computeStreak, calcStreak } from '../../src/domain/streak.js';
 import { currentDayIndex, goalDate } from '../../src/domain/journey.js';
 import {
-  checkinGaps, durationInputValue, formatExercise, formatExerciseDuration, formatLitres, mealCount, parseExerciseDuration,
+  checkinGaps, formatLitres, mealCount,
 } from '../../src/domain/checkin.js';
 import { progressStats, resolveRange, shareStats } from '../../src/domain/metrics.js';
 import { ACH_DEFS, achievementContext, findNewUnlocks } from '../../src/domain/achievements.js';
 import { validatePasswordChange } from '../../src/domain/password.js';
 import { monotonePath, niceTicks } from '../../src/ui/chart-math.js';
-import { checkinToPayload, rowsToCheckins } from '../../src/data/mappers.js';
 
 const days = (...ds) => Object.fromEntries(ds.map((d) => [d, {}]));
 const run = (start, n) => Array.from({ length: n }, (_, i) => addDays(start, i));
@@ -110,50 +109,7 @@ test('dates never shift with the local timezone (pure calendar arithmetic)', () 
   assert.match(formatDate('2026-11-24'), /24/);
 });
 
-// ---------------------------------------------------------------- movement duration
-test("movement duration: whole minutes stored, shown in the entry's own unit", () => {
-  assert.deepEqual(parseExerciseDuration('30', 'minutes'), { ok: true, minutes: 30 });
-  assert.deepEqual(parseExerciseDuration('90', 'minutes'), { ok: true, minutes: 90 });
-  assert.deepEqual(parseExerciseDuration('1', 'hours'), { ok: true, minutes: 60 });
-  assert.deepEqual(parseExerciseDuration('1.5', 'hours'), { ok: true, minutes: 90 });
-  assert.deepEqual(parseExerciseDuration('1,5', 'hours'), { ok: true, minutes: 90 });
-  assert.deepEqual(parseExerciseDuration('0.25', 'hours'), { ok: true, minutes: 15 });
-  assert.equal(formatExerciseDuration({ duration: 60, unit: 'hours' }), '1 hr');
-  assert.equal(formatExerciseDuration({ duration: 90, unit: 'hours' }), '1.5 hr');
-  assert.equal(formatExerciseDuration({ duration: 90, unit: 'minutes' }), '90 min');
-  assert.equal(formatExerciseDuration({ duration: 60, unit: 'minutes' }), '60 min'); // not silently turned into "1 hr"
-  assert.equal(formatExercise({ type: 'Walking', duration: 30, unit: 'minutes' }), 'Walking · 30 min');
-  assert.equal(formatExercise({ type: 'Gym', duration: 67, unit: 'minutes' }), 'Gym · 67 min');
-});
-
-test('movement duration: editing preserves the original meaningful duration', () => {
-  for (const ex of [{ duration: 60, unit: 'hours' }, { duration: 90, unit: 'hours' }, { duration: 80, unit: 'hours' }, { duration: 45, unit: 'minutes' }]) {
-    const typed = durationInputValue(ex);
-    const back = parseExerciseDuration(typed, ex.unit);
-    assert.equal(back.ok, true);
-    assert.equal(back.minutes, ex.duration, `${typed} ${ex.unit}`);
-  }
-});
-
-test('movement duration: invalid values are rejected with a message', () => {
-  for (const [raw, unit] of [['', 'minutes'], ['abc', 'minutes'], ['1.5', 'minutes'], ['0', 'minutes'], ['0', 'hours'], ['-5', 'minutes'], ['1441', 'minutes'], ['25', 'hours'], ['1.555', 'hours'], ['1e2', 'hours']]) {
-    const r = parseExerciseDuration(raw, unit);
-    assert.equal(r.ok, false, `${raw} ${unit}`);
-    assert.ok(r.error);
-  }
-});
-
-test('movement unit round-trips through the Supabase mappers (payload + rows)', () => {
-  const c = { mood: null, weight: null, water: 0, meals: { breakfast: [], lunch: [], dinner: [], snacks: [] }, exercise: { type: 'Gym', duration: 90, unit: 'hours' }, notes: '' };
-  const p = checkinToPayload(c);
-  assert.equal(p.exercise_minutes, 90);
-  assert.equal(p.exercise_unit, 'hours');
-  const back = rowsToCheckins([{ id: 'a', checkin_date: '2026-09-26', mood: null, weight_kg: null, water_ml: 0, exercise_type: 'Gym', exercise_minutes: 90, exercise_unit: 'hours', notes: '' }], [])['2026-09-26'];
-  assert.deepEqual(back.exercise, { type: 'Gym', duration: 90, unit: 'hours' });
-  // rows from a project that has not run the exercise_unit migration yet default to minutes (never crash)
-  const legacy = rowsToCheckins([{ id: 'a', checkin_date: '2026-09-26', mood: null, weight_kg: null, water_ml: 0, exercise_type: 'Gym', exercise_minutes: 30, notes: '' }], [])['2026-09-26'];
-  assert.equal(legacy.exercise.unit, 'minutes');
-});
+// (movement duration / details are covered in tests/unit/movement.test.js)
 
 // ---------------------------------------------------------------- hydration + completion gaps
 test('hydration display uses the user goal, never a hard-coded one', () => {

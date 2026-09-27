@@ -11,9 +11,9 @@ import { state } from '../state.js';
 import { getRepo } from '../data/repository.js';
 import { todayStr } from '../domain/dates.js';
 import {
-  MEAL_CATEGORIES, checkinGaps, cloneCheckin, durationInputValue, emptyCheckin, formatLitres, nowTimeLabel, nowTimeValue,
-  parseExerciseDuration, to12, to24,
+  MEAL_CATEGORIES, checkinGaps, cloneCheckin, emptyCheckin, formatLitres, nowTimeLabel, nowTimeValue, to12, to24,
 } from '../domain/checkin.js';
+import { MUSCLE_SUGGESTIONS, buildExercise, cleanMuscles, normalizeExercise, splitMinutes } from '../domain/movement.js';
 import { currentDayIndex, lastLoggedWeight, waterGoalOf, waterMessage } from '../domain/journey.js';
 import { calcStreak } from '../domain/streak.js';
 import { ACH_DEFS } from '../domain/achievements.js';
@@ -52,23 +52,7 @@ export function openCheckin() {
   $('e-ci-water').textContent = '';
   updateWaterUI(true);
   MEAL_CATEGORIES.forEach(renderMeals);
-  $('e-ci-ex-dur').textContent = '';
-  $('ci-ex-dur').removeAttribute('aria-invalid');
-  if (draft.exercise) {
-    $('ci-ex-yes').classList.add('on');
-    $('ci-ex-no').classList.remove('on');
-    $('ci-ex-detail').style.display = 'block';
-    $('ci-ex-type').value = draft.exercise.type;
-    setUnitUI(draft.exercise.unit || 'minutes');
-    $('ci-ex-dur').value = durationInputValue(draft.exercise); // the entry's own unit, exactly as it was saved
-  } else {
-    $('ci-ex-no').classList.add('on');
-    $('ci-ex-yes').classList.remove('on');
-    $('ci-ex-detail').style.display = 'none';
-    $('ci-ex-type').selectedIndex = 0;
-    setUnitUI('minutes');
-    $('ci-ex-dur').value = '';
-  }
+  loadMovementForm(draft.exercise); // today's saved movement, exactly as it was logged (or the rest state)
   go('s-checkin');
 }
 
@@ -209,32 +193,179 @@ export function doDeleteMeal(cat, i) {
   renderMeals(cat);
 }
 
-// ---------- exercise ----------
-export function setExercise(yes) {
-  $('ci-ex-yes').classList.toggle('on', yes);
-  $('ci-ex-no').classList.toggle('on', !yes);
-  $('ci-ex-detail').style.display = yes ? 'block' : 'none';
-  if (!yes) state.draft.exercise = null;
+// ---------- movement ----------
+// The form is DOM + state.exType / state.exMuscles. Only the fields that belong to the chosen type are shown, and
+// buildExercise() (domain/movement.js) keeps only those on save, so nothing from another type can leak into a day.
+const FIELD_IDS = ['ci-ex-hours', 'ci-ex-mins', 'ci-ex-distance', 'ci-ex-steps', 'ci-ex-desc'];
+const ERROR_IDS = ['e-ci-ex-type', 'e-ci-ex-dur', 'e-ci-ex-distance', 'e-ci-ex-steps', 'e-ci-ex-desc'];
+const TYPE_COPY = {
+  Gym: { dur: 'How long did you train?' },
+  Running: { dur: 'How long did you run?' },
+  Walking: { dur: 'How long did you walk?' },
+  'Home workout': { dur: 'How long did you work out?', desc: 'What did you do?', ph: 'e.g. Abs + 20 min cardio' },
+  Other: { dur: 'How long?', desc: 'What did you do?', ph: 'Describe what you did...' },
+};
+
+function clearMovementErrors() {
+  ERROR_IDS.forEach((id) => { $(id).textContent = ''; });
+  FIELD_IDS.forEach((id) => $(id).removeAttribute('aria-invalid'));
 }
 
-function setUnitUI(unit) {
-  state.exUnit = unit;
-  ['minutes', 'hours'].forEach((u) => {
-    const b = $('ci-ex-unit-' + u);
-    b.classList.toggle('on', u === unit);
-    b.setAttribute('aria-checked', String(u === unit));
+/** Puts the saved movement (or the rest state) into the form. */
+function loadMovementForm(exercise) {
+  const ex = normalizeExercise(exercise);
+  clearMovementErrors();
+  FIELD_IDS.forEach((id) => { $(id).value = ''; });
+  $('ci-ex-other').value = '';
+  $('ci-ex-other-row').hidden = true;
+  $('ci-ex-other-btn').setAttribute('aria-expanded', 'false');
+  state.exMuscles = ex ? [...ex.muscles] : [];
+  state.exType = null; // so the loaded values below are not treated as a type switch
+  const { hours, minutes } = splitMinutes(ex ? ex.duration : null);
+  $('ci-ex-hours').value = hours;
+  $('ci-ex-mins').value = minutes;
+  if (ex) {
+    $('ci-ex-distance').value = ex.distance == null ? '' : String(ex.distance);
+    $('ci-ex-steps').value = ex.steps == null ? '' : String(ex.steps);
+    $('ci-ex-desc').value = ex.description;
+  }
+  setMoved(!!ex);
+  applyMovementType(ex ? ex.type : null);
+}
+
+function setMoved(yes) {
+  [['ci-ex-yes', yes], ['ci-ex-no', !yes]].forEach(([id, on]) => {
+    $(id).classList.toggle('on', on);
+    $(id).setAttribute('aria-pressed', String(on));
   });
-  $('ci-ex-dur').placeholder = unit === 'hours' ? 'e.g. 1.5' : 'e.g. 30';
+  $('ci-ex-detail').hidden = !yes;
+  $('ci-ex-rest').hidden = yes;
 }
 
-/** Switching unit converts what was typed (90 minutes -> 1.5 hours) so nobody converts in their head. */
-export function setExUnit(unit) {
-  const input = $('ci-ex-dur');
-  const before = parseExerciseDuration(input.value, state.exUnit);
-  setUnitUI(unit);
-  if (before.ok) input.value = durationInputValue({ duration: before.minutes, unit });
-  $('e-ci-ex-dur').textContent = '';
-  input.removeAttribute('aria-invalid');
+/** "I moved today" / "Rest day". Rest hides every movement field; nothing typed is sent for a rest day. */
+export function setExercise(yes) {
+  setMoved(yes);
+  if (!yes) clearMovementErrors();
+}
+
+/** Shows only the chosen type's fields. */
+function applyMovementType(type) {
+  state.exType = type;
+  $$('#ci-ex-type .mv-chip').forEach((b, i) => {
+    const on = b.dataset.type === type;
+    b.setAttribute('aria-checked', String(on));
+    b.classList.toggle('on', on);
+    b.tabIndex = on || (!type && i === 0) ? 0 : -1; // roving focus: the radio group is one tab stop
+  });
+  $('ci-ex-fields').hidden = !type;
+  if (!type) return;
+  const copy = TYPE_COPY[type];
+  $('ci-ex-dur-q').textContent = copy.dur;
+  $('ci-ex-f-gym').hidden = type !== 'Gym';
+  $('ci-ex-f-run').hidden = type !== 'Running';
+  $('ci-ex-f-walk').hidden = type !== 'Walking';
+  $('ci-ex-f-desc').hidden = !copy.desc;
+  if (copy.desc) {
+    $('ci-ex-desc-q').innerHTML = `${copy.desc} <em>Optional</em>`;
+    $('ci-ex-desc').placeholder = copy.ph;
+  }
+  if (type === 'Gym') renderMuscles();
+}
+
+/** Switching type keeps the duration (it applies to every type) and clears the details the new type does not use. */
+export function pickMovementType(type) {
+  if (type !== state.exType) {
+    if (type !== 'Gym') { state.exMuscles = []; $('ci-ex-other').value = ''; }
+    if (type !== 'Running') $('ci-ex-distance').value = '';
+    if (type !== 'Walking') $('ci-ex-steps').value = '';
+    $('ci-ex-desc').value = ''; // Home workout <-> Other keep nothing either: it is a different description
+    const dur = ['ci-ex-hours', 'ci-ex-mins'];
+    ERROR_IDS.forEach((id) => { $(id).textContent = ''; });
+    [...FIELD_IDS].filter((id) => !dur.includes(id)).forEach((id) => $(id).removeAttribute('aria-invalid'));
+  }
+  $('e-ci-ex-type').textContent = '';
+  applyMovementType(type);
+}
+
+// ----- muscle groups (Gym): suggested chips + any custom text, multiple selection -----
+function renderMuscles() {
+  const chosen = state.exMuscles.map((m) => m.toLowerCase());
+  $$('#ci-ex-muscles [data-action="toggle-muscle"]').forEach((b) => {
+    if (b.classList.contains('custom')) return;
+    const on = chosen.includes(b.dataset.muscle.toLowerCase());
+    b.setAttribute('aria-checked', String(on));
+    b.classList.toggle('on', on);
+  });
+  const suggested = MUSCLE_SUGGESTIONS.map((m) => m.toLowerCase());
+  $('ci-ex-custom-chips').innerHTML = state.exMuscles
+    .filter((m) => !suggested.includes(m.toLowerCase()))
+    .map((m) => `<button type="button" class="mv-chip sm on custom" role="checkbox" aria-checked="true" aria-label="${esc(m)}, custom. Tap to remove" data-action="toggle-muscle" data-muscle="${esc(m)}">${esc(m)}<span aria-hidden="true"> ×</span></button>`)
+    .join('');
+}
+
+export function toggleMuscle(name) {
+  const key = name.toLowerCase();
+  const has = state.exMuscles.some((m) => m.toLowerCase() === key);
+  state.exMuscles = has ? state.exMuscles.filter((m) => m.toLowerCase() !== key) : cleanMuscles([...state.exMuscles, name]);
+  renderMuscles();
+}
+
+export function toggleOtherMuscle() {
+  const row = $('ci-ex-other-row');
+  row.hidden = !row.hidden;
+  $('ci-ex-other-btn').setAttribute('aria-expanded', String(!row.hidden));
+  if (!row.hidden) $('ci-ex-other').focus();
+}
+
+/** Adds what was typed as custom muscle group(s) ("Forearms, Calves" adds both). */
+export function addCustomMuscle() {
+  const input = $('ci-ex-other');
+  state.exMuscles = cleanMuscles([...state.exMuscles, ...input.value.split(/[,;\n]/)]);
+  input.value = '';
+  renderMuscles();
+  input.focus();
+}
+
+export function onMovementKeydown(e) {
+  if (e.target.id === 'ci-ex-other' && e.key === 'Enter') { e.preventDefault(); addCustomMuscle(); return; }
+  // Arrow keys move through the movement types, like any radio group.
+  if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key) || !e.target.closest) return;
+  const chips = $$('#ci-ex-type .mv-chip');
+  const i = chips.indexOf(e.target);
+  if (i < 0) return;
+  e.preventDefault();
+  const next = chips[(i + (['ArrowRight', 'ArrowDown'].includes(e.key) ? 1 : chips.length - 1)) % chips.length];
+  next.focus();
+  pickMovementType(next.dataset.type);
+}
+
+/** Reads the form -> { ok, exercise } (exercise null = rest day). Errors are shown only for values that are actually wrong. */
+function readMovementForm() {
+  if ($('ci-ex-no').classList.contains('on')) return { ok: true, exercise: null };
+  if (!state.exType) {
+    $('e-ci-ex-type').textContent = 'Choose what you did, or switch to Rest day.';
+    $$('#ci-ex-type .mv-chip')[0].focus();
+    return { ok: false };
+  }
+  if (state.exType === 'Gym' && $('ci-ex-other').value.trim()) addCustomMuscle(); // typed but not added yet: keep it, never lose it
+  const r = buildExercise({
+    type: state.exType, hours: $('ci-ex-hours').value, minutes: $('ci-ex-mins').value, muscles: state.exMuscles,
+    distance: $('ci-ex-distance').value, steps: $('ci-ex-steps').value, description: $('ci-ex-desc').value,
+  });
+  if (r.ok) return r;
+  clearMovementErrors();
+  const where = {
+    duration: ['e-ci-ex-dur', 'ci-ex-hours'], distance: ['e-ci-ex-distance', 'ci-ex-distance'],
+    steps: ['e-ci-ex-steps', 'ci-ex-steps'], description: ['e-ci-ex-desc', 'ci-ex-desc'],
+  };
+  let first = null;
+  Object.entries(r.errors).forEach(([k, msg]) => {
+    $(where[k][0]).textContent = msg;
+    $(where[k][1]).setAttribute('aria-invalid', 'true');
+    first = first || $(where[k][1]);
+  });
+  if (first) first.focus();
+  return { ok: false };
 }
 
 // ---------- save ----------
@@ -245,16 +376,9 @@ export async function saveCheckin(btn) {
   if (isBusy(btn)) return;
 
   // Validate first (nothing is sent, nothing is disabled, if the form isn't valid).
-  if ($('ci-ex-yes').classList.contains('on')) {
-    const r = parseExerciseDuration($('ci-ex-dur').value, state.exUnit);
-    if (!r.ok) {
-      $('e-ci-ex-dur').textContent = r.error;
-      $('ci-ex-dur').setAttribute('aria-invalid', 'true');
-      $('ci-ex-dur').focus();
-      return;
-    }
-    draft.exercise = { type: $('ci-ex-type').value, duration: r.minutes, unit: state.exUnit };
-  }
+  const movement = readMovementForm();
+  if (!movement.ok) return;
+  draft.exercise = movement.exercise;
   const waterRaw = $('ci-water-input').value.trim();
   if (waterRaw !== '' && !/^(\d+\.?\d*|\.\d+)$/.test(waterRaw)) {
     $('e-ci-water').textContent = 'Enter litres like 1.5.';

@@ -3,7 +3,7 @@
 //   node tests/e2e/ux.mjs        (needs .env; Auth "Confirm email" OFF)
 // The exercise_unit checks need supabase/migrations/2026-09-27_exercise_unit.sql applied; without it they are
 // reported as NOT VERIFIED (never as passed).
-import { PASS, addDays, ci, dbView, hasExerciseUnit, mkChecks, mkRepo, newPage, seedAccount, startApp, today, txt, uiLogin, URL_, KEY } from './kit.mjs';
+import { PASS, addDays, ci, dbView, hasMovementColumns, mkChecks, mkRepo, newPage, seedAccount, startApp, today, txt, uiLogin, URL_, KEY } from './kit.mjs';
 import { createClient } from '@supabase/supabase-js';
 import { mkdirSync } from 'node:fs';
 
@@ -13,8 +13,8 @@ mkdirSync(SHOTS, { recursive: true });
 const app = await startApp(5178);
 const { BASE, browser } = app;
 const problems = [];
-const unitMigrated = await hasExerciseUnit();
-console.log(unitMigrated ? 'exercise_unit column present on the live project' : 'exercise_unit column MISSING on the live project (migration not applied): unit persistence will be NOT VERIFIED');
+const moveMigrated = await hasMovementColumns();
+console.log(moveMigrated ? 'movement journal columns present on the live project' : 'movement journal columns MISSING on the live project (2026-10-01 migration not applied): movement DETAIL persistence will be NOT VERIFIED');
 
 const nav = (page, s) => page.click(`.navbtn[data-s="${s}"]`);
 const inView = (page, sel) => page.locator(sel).first().evaluate((e) => {
@@ -70,24 +70,18 @@ check('HYDRATION: quick add keeps the field in sync (1.75)', (await pa.inputValu
 await pa.click('.wctrl button[data-n="-250"]');
 check('HYDRATION: minus button back to 1.5', (await pa.inputValue('#ci-water-input')) === '1.5');
 
-// movement: unit picker
+// movement: type picker + hours/minutes
 await pa.click('#ci-ex-yes');
-await pa.selectOption('#ci-ex-type', 'Walking');
-const unitBtn = await pa.locator('#ci-ex-unit-hours').boundingBox();
-check('MOVEMENT: Minutes/Hours picker present, default Minutes, ≥44px targets', (await pa.getAttribute('#ci-ex-unit-minutes', 'aria-checked')) === 'true' && unitBtn.height >= 44);
-await pa.click('#ci-save-btn'); // no duration typed
-check('MOVEMENT: empty duration is rejected inline (nothing saved)', (await txt(pa, '#e-ci-ex-dur')).length > 0 && (await pa.locator('#s-checkin.active').count()) === 1);
+await pa.click('#ci-ex-type [data-type="Walking"]');
+const hrBox = await pa.locator('#ci-ex-hours').boundingBox();
+check('MOVEMENT: type picker + hours/minutes fields present, >=44px targets', (await pa.getAttribute('#ci-ex-type [data-type="Walking"]', 'aria-checked')) === 'true' && hrBox.height >= 44);
+await pa.fill('#ci-ex-mins', '75');
+await pa.click('#ci-save-btn'); // minutes 75 is impossible
+check('MOVEMENT: impossible minutes are rejected inline (nothing saved)', (await txt(pa, '#e-ci-ex-dur')).length > 0 && (await pa.locator('#s-checkin.active').count()) === 1);
 check('MOVEMENT: nothing was written to Supabase by the rejected save', (await dbView(A.email)).checkins.length === 0);
-await pa.fill('#ci-ex-dur', '90');
-await pa.click('#ci-ex-unit-hours');
-check('MOVEMENT: switching Minutes→Hours converts 90 → 1.5 (no mental maths)', (await pa.inputValue('#ci-ex-dur')) === '1.5');
-await pa.click('#ci-ex-unit-minutes');
-check('MOVEMENT: switching back converts 1.5 → 90', (await pa.inputValue('#ci-ex-dur')) === '90');
-await pa.click('#ci-ex-unit-hours');
-await pa.fill('#ci-ex-dur', 'abc');
-await pa.click('#ci-save-btn');
-check('MOVEMENT: junk duration is rejected', /hours/i.test(await txt(pa, '#e-ci-ex-dur')));
-await pa.fill('#ci-ex-dur', '1.5');
+await pa.fill('#ci-ex-hours', '1');
+await pa.fill('#ci-ex-mins', '30');
+await pa.fill('#ci-ex-steps', '6420');
 await pa.click('#ci-mood [data-m="great"]');
 await pa.fill('#ci-weight', '63.8');
 await pa.screenshot({ path: `${SHOTS}/ux-checkin-390.png`, fullPage: true });
@@ -112,13 +106,13 @@ await pa.waitForSelector('#s-home.active');
 let db = await dbView(A.email);
 check('DB: exactly ONE check-in row; achievements = [first]', db.checkins.length === 1 && db.ach.map((a) => a.achievement_id).join() === 'first');
 check('DB: water 1500, weight 63.8, Walking, 90 minutes', db.checkins[0].water_ml === 1500 && Number(db.checkins[0].weight_kg) === 63.8 && db.checkins[0].exercise_type === 'Walking' && db.checkins[0].exercise_minutes === 90);
-if (unitMigrated) check('DB: unit "hours" stored with the minutes', db.checkins[0].exercise_unit === 'hours');
-else notVerified('MOVEMENT unit persistence in Supabase', 'live project has no exercise_unit column: run supabase/migrations/2026-09-27_exercise_unit.sql');
+if (moveMigrated) check('DB: Walking steps stored with the minutes', db.checkins[0].exercise_steps === 6420);
+else notVerified('MOVEMENT detail persistence in Supabase', 'live project has no movement columns: run supabase/migrations/2026-10-01_movement_journal.sql (after the hardening)');
 
 // Home after completion
 check('HOME (after check-in): completed state, not "Start your first check-in"', (await txt(pa, '#h-ci-title')) === "Today's check-in is complete" && /COMPLETE/.test(await txt(pa, '#h-ci-eyebrow')));
 const sum = await txt(pa, '#h-ci-summary');
-check('HOME: summary from saved data (weight, water / goal, movement, mood, meals)', /Weight\s*63\.8 kg/.test(sum) && /Water\s*1\.5 L \/ 5 L/.test(sum) && /Movement\s*Walking · 1\.5 hr/.test(sum) && /Mood\s*Great/.test(sum) && /Meals\s*None logged/.test(sum), sum);
+check('HOME: summary from saved data (weight, water / goal, movement, mood, meals)', /Weight\s*63\.8 kg/.test(sum) && /Water\s*1\.5 L \/ 5 L/.test(sum) && /Movement\s*Walking · 1 hr 30 min/.test(sum) && /Mood\s*Great/.test(sum) && /Meals\s*None logged/.test(sum), sum);
 check('HOME: clear "Edit check-in" action', /Edit check-in/.test(await txt(pa, '#h-ci-cta')) && (await pa.locator('#h-ci-cta').boundingBox()).height >= 44);
 check('HOME: streak reads "1 day streak" and the card says day one is done', (await txt(pa, '#h-streak')) === '1 day streak' && (await txt(pa, '#h-motiv')) === 'Day one is done. Keep it going.');
 await pa.screenshot({ path: `${SHOTS}/ux-home-done-390.png` });
@@ -127,19 +121,19 @@ await pa.screenshot({ path: `${SHOTS}/ux-home-done-390.png` });
 await pa.click('.navbtn.fab');
 await pa.waitForSelector('#s-checkin.active');
 check('PLUS (after check-in): opens the EXISTING check-in, marked Completed', (await pa.locator('#ci-status').isVisible()) && /Completed/.test(await txt(pa, '#ci-status')) && (await txt(pa, '#ci-save-btn')) === 'Update check-in');
-check('PLUS: weight, water, mood, movement all loaded (not blank)', (await pa.inputValue('#ci-weight')) === '63.8' && (await pa.inputValue('#ci-water-input')) === '1.5' && (await pa.locator('#ci-mood .mood.sel[data-m="great"]').count()) === 1 && (await pa.inputValue('#ci-ex-type')) === 'Walking' && (await pa.inputValue('#ci-ex-dur')) === '1.5' && (await pa.getAttribute('#ci-ex-unit-hours', 'aria-checked')) === 'true');
+check('PLUS: weight, water, mood, movement all loaded (not blank)', (await pa.inputValue('#ci-weight')) === '63.8' && (await pa.inputValue('#ci-water-input')) === '1.5' && (await pa.locator('#ci-mood .mood.sel[data-m="great"]').count()) === 1 && (await pa.getAttribute('#ci-ex-type [data-type="Walking"]', 'aria-checked')) === 'true' && (await pa.inputValue('#ci-ex-hours')) === '1' && (await pa.inputValue('#ci-ex-mins')) === '30');
 await pa.screenshot({ path: `${SHOTS}/ux-checkin-edit-390.png`, fullPage: true });
-// the Home card path opens the very same thing
+// the Home card's "Edit check-in" button opens the very same thing (the card itself is display-only)
 await pa.click('#s-checkin [data-action="go"]');
-await pa.click('#h-checkin-card');
+await pa.click('#h-ci-cta');
 check('HOME card "Edit check-in" opens the same existing check-in', (await txt(pa, '#ci-save-btn')) === 'Update check-in' && (await pa.inputValue('#ci-weight')) === '63.8');
 // add a meal + change movement to Gym 67 minutes, save
 await pa.click('[data-action="add-meal"][data-cat="lunch"]');
 await pa.fill('#meal-name', 'Rice and chicken');
 await pa.click('#ov-meal [data-action="confirm-meal"]');
-await pa.selectOption('#ci-ex-type', 'Gym');
-await pa.click('#ci-ex-unit-minutes');
-await pa.fill('#ci-ex-dur', '67');
+await pa.click('#ci-ex-type [data-type="Gym"]');
+await pa.fill('#ci-ex-hours', '1');
+await pa.fill('#ci-ex-mins', '7');
 await pa.fill('#ci-weight', '63.5');
 await pa.click('#ci-save-btn');
 await pa.waitForSelector('#ov-celebrate.show');
@@ -149,36 +143,29 @@ await pa.click('#ov-celebrate .btn');
 await pa.waitForSelector('#s-home.active');
 db = await dbView(A.email);
 check('DB: still ONE check-in row after edit; values UPDATED (63.5 kg, Gym 67 min, 1 meal)', db.checkins.length === 1 && Number(db.checkins[0].weight_kg) === 63.5 && db.checkins[0].exercise_type === 'Gym' && db.checkins[0].exercise_minutes === 67 && db.meals.length === 1 && db.checkins[0].water_ml === 1500);
-if (unitMigrated) check('DB: unit updated to minutes', db.checkins[0].exercise_unit === 'minutes');
 check('DB: achievements unchanged (no duplicate unlock)', db.ach.length === 1);
-check('HOME: summary now shows Gym · 67 min and 1 meal', /Movement\s*Gym · 67 min/.test(await txt(pa, '#h-ci-summary')) && /Meals\s*1 logged/.test(await txt(pa, '#h-ci-summary')));
+check('HOME: summary now shows Gym · 67 min and 1 meal', /Movement\s*Gym · 1 hr 7 min/.test(await txt(pa, '#h-ci-summary')) && /Meals\s*1 logged/.test(await txt(pa, '#h-ci-summary')));
 // reload: the saved unit / duration survives a full page reload from Supabase
 await pa.reload();
 await pa.waitForSelector('#s-home.active');
 await pa.click('.navbtn.fab');
-check('PLUS after RELOAD still opens the saved check-in in edit mode', (await pa.locator('#ci-status').isVisible()) && (await pa.inputValue('#ci-weight')) === '63.5' && (await pa.inputValue('#ci-ex-dur')) === '67' && (await pa.getAttribute('#ci-ex-unit-minutes', 'aria-checked')) === 'true');
+check('PLUS after RELOAD still opens the saved check-in in edit mode', (await pa.locator('#ci-status').isVisible()) && (await pa.inputValue('#ci-weight')) === '63.5' && (await pa.inputValue('#ci-ex-hours')) === '1' && (await pa.inputValue('#ci-ex-mins')) === '7');
 db = await dbView(A.email);
 check('DB: one row after all of that', db.checkins.length === 1);
 
 // hours round-trip through Supabase
-await pa.selectOption('#ci-ex-type', 'Running');
-await pa.click('#ci-ex-unit-hours');
-await pa.fill('#ci-ex-dur', '1');
+await pa.click('#ci-ex-type [data-type="Running"]');
+await pa.fill('#ci-ex-hours', '1');
+await pa.fill('#ci-ex-mins', '');
 await pa.click('#ci-save-btn');
 await pa.waitForSelector('#ov-celebrate.show');
 await pa.click('#ov-celebrate .btn');
 await pa.reload();
 await pa.waitForSelector('#s-home.active');
 const homeSum = await txt(pa, '#h-ci-summary');
-if (unitMigrated) check('MOVEMENT: "1 hour" survives reload as 1 hr (not converted to 60 min)', /Running · 1 hr/.test(homeSum), homeSum);
-else {
-  check('MOVEMENT (unmigrated project): the duration is never lost, it degrades to minutes', /Running · 60 min/.test(homeSum), homeSum);
-  notVerified('"1 hour" stays "1 hr" after reload', 'needs the exercise_unit migration on the live project');
-}
+check('MOVEMENT: "1 hr" survives reload as 1 hr (not converted to 60 min)', /Running · 1 hr/.test(homeSum), homeSum);
 await pa.click('.navbtn.fab');
-const reopened = await pa.inputValue('#ci-ex-dur');
-if (unitMigrated) check('MOVEMENT: editing 1 hr later preserves "1 hour"', reopened === '1' && (await pa.getAttribute('#ci-ex-unit-hours', 'aria-checked')) === 'true');
-else check('MOVEMENT (unmigrated): editing later still shows the correct duration (60 min)', reopened === '60');
+check('MOVEMENT: editing 1 hr later shows 1 hr, 0 min', (await pa.inputValue('#ci-ex-hours')) === '1' && (await pa.inputValue('#ci-ex-mins')) === '');
 await pa.click('#s-checkin [data-action="go"]');
 
 // ======================================================================================================
@@ -515,7 +502,7 @@ for (const [w, h] of SIZES) {
   if ([320, 390, 768, 1280].includes(w)) await pr.screenshot({ path: `${SHOTS}/ux-home-${w}.png` });
   await pr.click('.navbtn.fab');
   await pr.waitForSelector('#s-checkin.active');
-  await audit('check-in (edit)', '#ci-ex-unit-hours, #ci-ex-unit-minutes, .editgoal, .wctrl button');
+  await audit('check-in (edit)', '#ci-ex-type .mv-chip, .editgoal, .wctrl button');
   if ([320, 390, 1280].includes(w)) await pr.screenshot({ path: `${SHOTS}/ux-checkin-${w}.png`, fullPage: true });
   await pr.click('#s-checkin [data-action="go"]');
   await pr.click('.navbtn[data-s="s-progress"]');

@@ -11,6 +11,7 @@ const MIGRATIONS = {
   journey: 'supabase/migrations/2026-09-29_journey_complete.sql',
   hardening: 'supabase/migrations/2026-09-30_security_hardening.sql',
   audit: 'supabase/migrations/2026-09-30b_auth_audit_triggers.sql',
+  movement: 'supabase/migrations/2026-10-01_movement_journal.sql',
 };
 const [A, B, CAROL, FORGER, LEGIT] = [uuid(1), uuid(2), uuid(3), uuid(4), uuid(5)];
 let old, h; // the pre-hardening database
@@ -87,6 +88,21 @@ test('hardening migration: quarantines forged achievements ONCE, keeps derivable
   assert.equal((await h.as(LEGIT, () => old.query('select water_ml from public.checkins'))).rows[0].water_ml, 2600);
 });
 
+// ---- the movement journal (separate from the hardening): applied on top of the hardened database ----
+test('movement migration: refuses to run before the hardening, then upgrades in place, keeps old check-ins and is re-runnable', async () => {
+  const preHardening = await makeDb(['tests/fixtures/schema.pre-hardening.sql']);
+  await assert.rejects(preHardening.exec(read(MIGRATIONS.movement)), /apply the security hardening/);
+  await old.exec(read(MIGRATIONS.movement));
+  await old.exec(read(MIGRATIONS.movement));
+  // the legitimate user's pre-existing "Gym, 30 min" check-in is untouched, and reads as "details not recorded"
+  const r = (await h.as(LEGIT, () => old.query('select exercise_type, exercise_minutes, exercise_muscles, exercise_distance_mi, exercise_steps, exercise_description from public.checkins'))).rows;
+  assert.deepEqual(r, [{ exercise_type: 'Gym', exercise_minutes: 30, exercise_muscles: [], exercise_distance_mi: null, exercise_steps: null, exercise_description: '' }]);
+  // and the new details save through the same RPC
+  const ok = await h.as(LEGIT, () => old.query(`select public.save_checkin(current_date, $1::jsonb) as r`, [JSON.stringify(payload({ exercise_minutes: 70, exercise_muscles: ['Chest', 'Biceps'] }))]));
+  assert.equal(ok.rows[0].r.ok, true);
+  assert.deepEqual((await h.as(LEGIT, () => old.query('select exercise_muscles from public.checkins'))).rows, [{ exercise_muscles: ['Chest', 'Biceps'] }]);
+});
+
 // ---- schema.sql and the migration must describe the same database ----
 const catalog = async (db) => {
   const q = async (sql) => (await db.query(sql)).rows;
@@ -117,7 +133,7 @@ test('an upgraded database is indistinguishable from a fresh schema.sql (functio
 });
 
 test('schema.sql and the migrations carry byte-identical core and audit-trigger sections', () => {
-  for (const [tag, file, min] of [['SECURITY HARDENING', MIGRATIONS.hardening, 5000], ['AUTH AUDIT TRIGGERS', MIGRATIONS.audit, 1500]]) {
+  for (const [tag, file, min] of [['SECURITY HARDENING', MIGRATIONS.hardening, 5000], ['AUTH AUDIT TRIGGERS', MIGRATIONS.audit, 1500], ['MOVEMENT JOURNAL', MIGRATIONS.movement, 3000]]) {
     const grab = (sql) => sql.slice(sql.indexOf(`-- >>> ${tag}`), sql.indexOf(`-- <<< ${tag}`)).replaceAll('\r\n', '\n');
     const [s, m] = [grab(read('supabase/schema.sql')), grab(read(file))];
     assert.ok(s.length > min, `${tag} section found`);

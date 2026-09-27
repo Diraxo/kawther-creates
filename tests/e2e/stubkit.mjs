@@ -47,6 +47,7 @@ export class Stub {
   failStatus = null; // e.g. 500 -> every REST/RPC call (and password login) fails
   grant = []; // achievements the save_checkin RPC grants: [{ id, on }]
   requests = []; // [{ method, path }]
+  saves = []; // every save_checkin payload the app sent: [{ date, payload }]
   count = (re) => this.requests.filter((r) => re.test(r.method + ' ' + r.path)).length;
 
   /** Adds an account. checkins: { [daysAgo]: { weight, water, mood, ... } }; journey null = not onboarded yet. */
@@ -66,6 +67,8 @@ export class Stub {
     Object.assign(row, {
       mood: c.mood ?? null, weight_kg: c.weight ?? null, water_ml: c.water ?? 0,
       exercise_type: c.exercise_type ?? null, exercise_minutes: c.exercise_minutes ?? null, exercise_unit: c.exercise_unit ?? 'minutes', notes: c.notes ?? '',
+      exercise_muscles: c.exercise_muscles ?? [], exercise_distance_mi: c.exercise_distance_mi ?? null, exercise_steps: c.exercise_steps ?? null,
+      exercise_description: c.exercise_description ?? '',
     });
     acct.checkins[date] = row;
     acct.meals = acct.meals.filter((m) => m.checkin_id !== row.id);
@@ -134,7 +137,8 @@ export class Stub {
     }
     if (t === 'rpc/save_checkin') {
       const p = body.p_checkin;
-      this.putCheckin(a, body.p_date, { mood: p.mood, weight: p.weight_kg, water: p.water_ml, exercise_type: p.exercise_type, exercise_minutes: p.exercise_minutes, exercise_unit: p.exercise_unit, notes: p.notes, meals: p.meals });
+      this.putCheckin(a, body.p_date, { mood: p.mood, weight: p.weight_kg, water: p.water_ml, exercise_type: p.exercise_type, exercise_minutes: p.exercise_minutes, exercise_unit: p.exercise_unit, exercise_muscles: p.exercise_muscles, exercise_distance_mi: p.exercise_distance_mi, exercise_steps: p.exercise_steps, exercise_description: p.exercise_description, notes: p.notes, meals: p.meals });
+      this.saves.push({ date: body.p_date, payload: p });
       const unlocked = this.grant;
       unlocked.forEach((g) => a.ach.push(g));
       return json(200, { ok: true, unlocked });

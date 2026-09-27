@@ -98,11 +98,11 @@ export async function dbView(email, pass = PASS) {
   return out;
 }
 
-/** Does the live project have the exercise_unit migration? (decides PASS vs NOT VERIFIED for unit persistence) */
-export async function hasExerciseUnit() {
+/** Does the live project have the movement journal migration (2026-10-01)? Decides PASS vs NOT VERIFIED for detail persistence. */
+export async function hasMovementColumns() {
   const repo = mkRepo();
   await repo.signUp({ name: 'Probe', email: testEmail('probe'), password: PASS });
-  const { error } = await repo.sb.from('checkins').select('exercise_unit').limit(1);
+  const { error } = await repo.sb.from('checkins').select('exercise_steps').limit(1);
   await repo.signOut();
   return !error;
 }

@@ -95,8 +95,8 @@ await page.fill('#meal-name', 'Lentils');
 await page.fill('#meal-time', '19:00');
 await page.click('#ov-meal [data-action="confirm-meal"]');
 await page.click('#ci-ex-yes');
-await page.selectOption('#ci-ex-type', 'Running');
-await page.fill('#ci-ex-dur', '30');
+await page.click('#ci-ex-type [data-type="Running"]');
+await page.fill('#ci-ex-mins', '30');
 await page.fill('#ci-notes', 'Live test note');
 await page.click('#ci-save-btn');
 await page.waitForSelector('#ov-celebrate.show');
@@ -126,13 +126,13 @@ check('Journey: today complete', (await page.locator('#j-cal .cal-day.today.c').
 await page.click('#j-cal .cal-day.today');
 await page.waitForFunction(() => document.getElementById('j-detail-inner').innerText.includes('Checked in'));
 const det = await txt('#j-detail-inner');
-check('Journey day detail: weight, exercise, meals, note', det.includes('71.5 kg') && det.includes('Running · 30 min') && det.includes('Lentils') && det.includes('Live test note'));
+check('Journey day detail: weight, exercise, meals, note', det.includes('71.5 kg') && det.includes('RUNNING') && det.includes('30 min') && det.includes('Lentils') && det.includes('Live test note'));
 await nav('s-ach');
 check('Achievements: 1 unlocked (First Step)', (await page.locator('.ach:not(.locked)').count()) === 1);
 
 section('Edit the same day: update, not duplicate; meal replacement');
 await nav('s-home');
-await page.click('#h-checkin-card');
+await page.click('#h-ci-cta');
 await page.click('#ci-meal-dinner .meal-del');
 await page.click('#ci-meal-dinner .mini-btn:not(.ghost2)');
 await page.click('.quickadd button:nth-child(2)');
@@ -164,8 +164,8 @@ check('achievements remain after login', (await page.locator('.ach:not(.locked)'
 await page.reload();
 await page.waitForSelector('#s-home.active');
 check('reload while logged in: session + data remain', /water\s*1 L \/ 0\.5 L/i.test(await txt('#h-ci-summary')) && (await txt('#h-daylabel')) === 'DAY 1 OF 60');
-await page.click('#h-checkin-card');
-check('reload: saved values restored into the editor (weight, meal, exercise, note)', (await page.inputValue('#ci-weight')) === '71.5' && (await page.locator('#ci-meal-breakfast .meal-item').count()) === 1 && (await page.inputValue('#ci-ex-dur')) === '30' && (await page.inputValue('#ci-notes')) === 'Live test note');
+await page.click('#h-ci-cta');
+check('reload: saved values restored into the editor (weight, meal, exercise, note)', (await page.inputValue('#ci-weight')) === '71.5' && (await page.locator('#ci-meal-breakfast .meal-item').count()) === 1 && (await page.inputValue('#ci-ex-mins')) === '30' && (await page.inputValue('#ci-notes')) === 'Live test note');
 
 check('no uncaught errors or console errors during the whole flow', problems.length === 0, problems.join(' | '));
 await browser.close();

@@ -9,6 +9,7 @@ import {
 import { computeStreak } from '../domain/streak.js';
 import { activeTarget, goalAchievement, goalCopy, progressToward, postGoalSummary } from '../domain/goal.js';
 import { formatExercise, formatLitres, mealCount } from '../domain/checkin.js';
+import { movementDetail } from '../domain/movement.js';
 import { capitalize, esc } from '../lib/format.js';
 import { showNav, tab } from '../ui/router.js';
 import { openOverlay } from '../ui/overlays.js';
@@ -43,8 +44,8 @@ function renderStreak(streak) {
   }
 }
 
-function summaryItem(label, value) {
-  return `<div class="ci-sum-item"><span>${label}</span><b>${esc(value)}</b></div>`;
+function summaryItem(label, value, sub = '') {
+  return `<div class="ci-sum-item"><span>${label}</span><b>${esc(value)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
 }
 
 function renderCheckinCard(user, today) {
@@ -70,7 +71,9 @@ function renderCheckinCard(user, today) {
   summary.innerHTML = [
     summaryItem('Weight', todays.weight ? `${todays.weight.toFixed(1)} kg` : 'Not logged'),
     summaryItem('Water', `${formatLitres(todays.water || 0)} / ${formatLitres(goal)}`),
-    summaryItem('Movement', todays.exercise ? formatExercise(todays.exercise) : 'Rest day'),
+    todays.exercise
+      ? summaryItem('Movement', formatExercise(todays.exercise), movementDetail(todays.exercise))
+      : summaryItem('Movement', 'Rest day', 'Recovery is part of the journey.'),
     summaryItem('Mood', todays.mood ? capitalize(todays.mood) : 'Not logged'),
     summaryItem('Meals', meals ? `${meals} logged` : 'None logged'),
   ].join('');

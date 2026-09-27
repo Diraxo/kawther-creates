@@ -15,10 +15,12 @@
     "test:live": "node tests/live/repo.live.mjs && node tests/live/security.live.mjs && node tests/e2e/live.mjs && node tests/e2e/responsive.mjs && node tests/e2e/ux.mjs",
     "test:ux": "node tests/e2e/ux.mjs",
     "test:lifecycle": "node tests/e2e/lifecycle.mjs",
+    "test:movement": "node tests/e2e/movement.mjs",
+    "test:goal": "node tests/e2e/goal.mjs",
     "test:duration": "node tests/e2e/duration.mjs",
     "test:responsive": "node tests/e2e/responsive.mjs",
     "test:headers": "node tests/e2e/headers.mjs",
-    "test:security": "node --test tests/integration/security.test.js tests/integration/upgrade.test.js tests/integration/hardening.test.js tests/integration/contract.test.js tests/unit/security.test.js tests/unit/headers.test.js"
+    "test:security": "node --test tests/integration/security.test.js tests/integration/upgrade.test.js tests/integration/hardening.test.js tests/integration/contract.test.js tests/integration/movement.test.js tests/unit/security.test.js tests/unit/headers.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0"
