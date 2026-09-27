@@ -29,15 +29,11 @@
 .renew-btn svg{width:16px; height:16px;}
 
 /* --- Today's check-in card (before / after completion) --- */
-.ci-card{min-height:44px;}
-.ci-card:focus-visible{outline:2px solid var(--emerald); outline-offset:3px; border-radius:20px;}
 .ci-summary{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 14px;}
 .ci-summary[hidden]{display:none;}
 .ci-sum-item{background:var(--card2); border-radius:12px; padding:10px 12px; min-width:0;}
 .ci-sum-item span{display:block; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--sub); margin-bottom:3px;}
 .ci-sum-item b{display:block; font-size:13.5px; font-weight:700; overflow-wrap:anywhere;}
-.ci-cta.edit{display:inline-flex; min-height:44px; padding:0 18px; border-radius:14px; border:1.5px solid var(--emerald); background:var(--emerald-tint); justify-content:center;}
-.ci-card:hover .ci-cta.edit{background:var(--emerald); color:#04150F;}
 
 /* --- Check-in form --- */
 .ci-status{display:inline-flex; align-items:center; gap:5px; margin-top:4px; font-size:12px; font-weight:700; color:var(--emerald); background:var(--emerald-tint); padding:3px 10px; border-radius:999px;}
@@ -52,7 +48,7 @@
 .water-label{display:block; font-size:12px; color:var(--sub); margin-bottom:2px;}
 .water-line{display:flex; align-items:baseline; gap:6px; border-bottom:2px solid var(--line); transition:border-color .2s; padding-bottom:2px; min-width:0;}
 .water-line:focus-within{border-color:var(--emerald);}
-.water-line input{width:4.2ch; min-width:0; flex:none; border:none; outline:none; background:transparent; color:var(--ink); font-family:'Plus Jakarta Sans',sans-serif; font-size:26px; font-weight:700; padding:2px 0; text-align:right;}
+.water-line input{width:1.4ch; min-width:1ch; max-width:6ch; flex:none; border:none; outline:none; background:transparent; color:var(--ink); font-family:'Plus Jakarta Sans',sans-serif; font-size:26px; font-weight:700; padding:2px 0; text-align:left;}
 .water-unit{font-family:'Plus Jakarta Sans',sans-serif; font-size:18px; font-weight:600;}
 .water-goalnote{font-size:14px; color:var(--sub); margin-left:4px; white-space:nowrap;}
 .wctrl button{width:44px; height:44px; transition:transform .12s, background .2s;}

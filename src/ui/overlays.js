@@ -1,5 +1,5 @@
 import { $ } from '../lib/dom.js';
-import { go } from './router.js';
+import { tab } from './router.js';
 
 const closeHooks = {};
 /** Run `fn` whenever overlay `id` is closed (used by the achievement queue). */
@@ -27,7 +27,7 @@ export function closeOverlay(id) {
   const opener = openers[id];
   delete openers[id];
   if (opener && opener.isConnected && opener.offsetParent !== null) opener.focus({ preventScroll: true });
-  if (id === 'ov-celebrate') go('s-home');
+  if (id === 'ov-celebrate') tab('s-home');
   if (closeHooks[id]) closeHooks[id]();
 }
 

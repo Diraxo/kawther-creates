@@ -5,6 +5,7 @@ import { getRepo } from '../data/repository.js';
 import { DEFAULT_WATER_GOAL, MAX_JOURNEY_DAYS, MIN_JOURNEY_DAYS, parseDuration } from '../domain/journey.js';
 import { todayStr } from '../domain/dates.js';
 import { go } from '../ui/router.js';
+import { isBusy, withBusy } from '../ui/busy.js';
 
 const validWeight = (v) => v && v >= 30 && v <= 300;
 
@@ -81,20 +82,21 @@ export function stepDur(el) {
   state.onboarding.duration = readCustom(true);
 }
 
-export function obStep4() {
+export function obStep4(btn) {
   const { custom } = state.onboarding;
   const duration = custom ? readCustom(true) : state.onboarding.duration;
   if (custom && duration === null) { $('ob-dur').focus(); return; }
   state.onboarding.duration = duration;
-  return finishOnboarding();
+  return finishOnboarding(btn);
 }
 
-export async function finishOnboarding() {
+export async function finishOnboarding(btn) {
+  if (isBusy(btn)) return;
   const { start, goal, duration } = state.onboarding;
   if (!parseDuration(duration).ok) return;
   const journey = { start: todayStr(), duration, startWeight: start, goalWeight: goal, waterGoal: DEFAULT_WATER_GOAL };
   try {
-    await getRepo().createJourney(journey);
+    await withBusy(btn, 'Starting your journey…', () => getRepo().createJourney(journey));
   } catch (e) {
     reportDataError(e, "Couldn't save your journey. Please try again.");
     return;

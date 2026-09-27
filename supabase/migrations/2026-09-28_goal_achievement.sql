@@ -1,5 +1,12 @@
 -- Goal Achievement: the 'goal' achievement, plus what the user chose to do after reaching their goal.
 -- Run once in the Supabase SQL editor (after schema.sql / earlier migrations). Safe to re-run.
+-- Guard: this migration predates the 2026-09-30 security hardening and would re-open direct table writes / replace hardened RPCs.
+do $$ begin
+  if to_regnamespace('private') is not null then
+    raise exception 'security hardening (2026-09-30) is already applied: do not re-run this older migration';
+  end if;
+end $$;
+
 
 alter table public.journeys add column if not exists post_goal_mode text;
 alter table public.journeys add column if not exists next_goal_weight numeric(5,1);

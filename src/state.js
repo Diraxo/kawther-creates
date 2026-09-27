@@ -1,5 +1,10 @@
 // Single in-memory app state. The repository persists; this is the working copy.
 export const state = {
+  /**
+   * App lifecycle: 'booting' (splash, nothing known yet) -> 'loading' (restoring session + loading the user's data)
+   * -> 'ready' (signed in, data loaded) | 'signed-out' | 'error' (could not load; never rendered as empty data).
+   */
+  status: 'booting',
   /** Current user in domain shape (see data/repository.js), or null when logged out. */
   user: null,
   /** In-progress check-in being edited. */

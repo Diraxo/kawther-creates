@@ -15,9 +15,11 @@ import {
   JOURNEY_ACHIEVEMENT, buildNextJourney, chapterOptions, isJourneyEnded, journeyRecap, recapCopy,
 } from '../domain/journeyComplete.js';
 import { closeOverlay, onOverlayClosed, openOverlay } from './overlays.js';
+import { withBusy } from './busy.js';
 import { renderHome } from '../screens/home.js';
 
 const ID = 'ov-complete';
+let claimed = null; // 'start|duration' of the journey we already asked the server about
 let recap = null;
 let kind = null;
 let busy = false;
@@ -110,7 +112,7 @@ export async function onJourneyFormSubmit(e) {
   if (!built.ok) return;
   busy = true;
   try {
-    await getRepo().startNextJourney(built.journey, kind);
+    await withBusy($('jc-submit'), 'Starting…', () => getRepo().startNextJourney(built.journey, kind));
   } catch (err) {
     reportDataError(err, "Couldn't start your next journey. Please try again.");
     busy = false;
@@ -138,15 +140,22 @@ export async function maybeCelebrateJourneyComplete() {
   const { user } = state;
   if (!user || !user.journey || !isJourneyEnded(user.journey, todayStr())) return;
   if (user.unlocked.includes(JOURNEY_ACHIEVEMENT)) return;
-  const on = goalDate(user.journey);
+  // The server decides: it grants 'Journey Complete' only once the active journey's last day has arrived.
+  // One attempt per journey per page load, so a refusal can never turn into a request loop.
+  const key = `${user.journey.start}|${user.journey.duration}`;
+  if (claimed === key) return;
+  claimed = key;
+  let granted;
   try {
-    await getRepo().unlockAchievement(JOURNEY_ACHIEVEMENT, on);
+    granted = await getRepo().claimJourneyComplete();
   } catch (e) {
-    console.error(e); // not persisted -> not celebrated; retried next time Home loads
+    console.error(e); // not persisted -> not celebrated; retried on the next page load
     return;
   }
+  const g = granted.unlocked.find((u) => u.id === JOURNEY_ACHIEVEMENT);
+  if (!g) return;
   user.unlocked.push(JOURNEY_ACHIEVEMENT);
-  user.unlockedDates[JOURNEY_ACHIEVEMENT] = on;
+  user.unlockedDates[JOURNEY_ACHIEVEMENT] = g.date;
   renderHome();
   // Wait for any other celebration (goal experience, milestone card, check-in sheet) to finish first.
   let tries = 0;

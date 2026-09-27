@@ -4,6 +4,13 @@
 --     Exactly one row per user is active (completed_on is null), enforced by a partial unique index.
 --   * user_achievements accepts the new 'journey' achievement.
 --   * create_journey (onboarding) now updates the ACTIVE journey only; start_next_journey archives it and starts the next.
+-- Guard: this migration predates the 2026-09-30 security hardening and would re-open direct table writes / replace hardened RPCs.
+do $$ begin
+  if to_regnamespace('private') is not null then
+    raise exception 'security hardening (2026-09-30) is already applied: do not re-run this older migration';
+  end if;
+end $$;
+
 
 alter table public.journeys drop constraint if exists journeys_user_id_key;
 alter table public.journeys add column if not exists completed_on date;

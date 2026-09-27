@@ -14,11 +14,15 @@
 <meta name="theme-color" content="#050605">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script>
-/* Apply the saved theme before first paint (no dark/light flash). */
-try{var t=localStorage.getItem('kc_theme')||'dark';if(t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}
-</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kawther">
+<!-- Web fonts must never block first paint (a render-blocking third-party stylesheet = black screen on a cold iPhone launch).
+     Loaded as media=print, then switched on by /font-swap.js once fetched; font-display=swap keeps text visible meanwhile. -->
+<link id="kc-fonts" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
+<script src="/theme-init.js"></script>
+<script src="/font-swap.js"></script>
 <style>
 /* Critical splash styles: inline so the branded screen paints before any JS/CSS bundle loads. */
 html{background:#060706;}
@@ -46,6 +50,7 @@ html{background:#060706;}
   <div class="sp-bar" aria-hidden="true"></div>
   <span class="sr-only">Loading Kawther | creates</span>
 </div>
+<div class="netbar" id="netbar" role="status" aria-live="polite" hidden><span class="netdot" aria-hidden="true"></span><div class="nettext"><b id="netbar-title"></b><span id="netbar-sub"></span></div><button type="button" id="netbar-retry" hidden>Retry</button></div>
 <div class="app" id="app">
 
 <!-- LANDING -->
@@ -64,9 +69,9 @@ html{background:#060706;}
 <section class="screen" id="s-error">
   <div class="hero-landing">
     <div class="klogo klogo--md" role="img" aria-label="Kawther creates"><img class="kw" src="/logo-white.png" alt="" decoding="async"><img class="kb" src="/logo-black.png" alt="" decoding="async"></div>
-    <h2 class="serif">We couldn't load your journal</h2>
+    <h2 class="serif" id="err-title">We couldn't load your journal</h2>
     <p id="err-msg">Something went wrong. Please try again.</p>
-    <button class="btn" data-action="reload">Try again</button>
+    <button class="btn" id="err-retry" data-action="retry-boot">Try again</button>
   </div>
 </section>
 
@@ -89,6 +94,7 @@ html{background:#060706;}
   <h2 class="serif">Welcome back</h2>
   <div class="field"><label for="li-email">Email</label><input id="li-email" type="email" placeholder="you@email.com" autocomplete="email"></div>
   <div class="field"><label for="li-pass">Password</label><div class="pw-wrap"><input id="li-pass" type="password" placeholder="Your password" autocomplete="current-password"><button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Show password" aria-pressed="false"><svg class="i-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="i-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button></div></div>
+  <div class="field" id="li-mfa-field" hidden><label for="li-mfa">Authentication code</label><input id="li-mfa" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6-digit code"></div>
   <div class="err" id="e-login">Email or password is incorrect.</div>
   <div style="height:6px"></div>
   <button class="btn" data-action="login">Log in</button>
@@ -215,11 +221,11 @@ html{background:#060706;}
     <p class="gc-line" id="h-jc-line"></p>
     <button type="button" class="btn" data-action="journey-complete-open">View recap &amp; choose what&rsquo;s next</button>
   </div>
-  <div class="card ci-card" id="h-checkin-card" role="button" tabindex="0" data-action="open-checkin">
+  <div class="card ci-card" id="h-checkin-card">
     <span class="ci-eyebrow" id="h-ci-eyebrow">TODAY</span>
     <h3 id="h-ci-title">How are you taking care of yourself today?</h3>
     <div class="ci-summary" id="h-ci-summary" hidden></div>
-    <div class="ci-cta" id="h-ci-cta">Check in <svg class="ic" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+    <button type="button" class="ci-cta" id="h-ci-cta" data-action="open-checkin">Check in <svg class="ic" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
   </div>
 </section>
 
@@ -311,7 +317,7 @@ html{background:#060706;}
       <div><div style="color:var(--sub); font-size:11.5px;">GOAL</div><b class="serif" id="p-goal" style="font-size:18px;">—</b></div>
     </div>
   </div>
-  <div class="card empty-card" id="p-empty" style="display:none;"><b class="serif">No progress history yet</b><p>Your progress will appear here once you log your first check-in.</p><button class="btn" data-action="open-checkin">Start your first check-in</button></div>
+  <div class="card empty-card" id="p-empty" style="display:none;"><b class="serif">Your progress will appear here</b><p>Complete your first check-in with a weight to start tracking your journey.</p><button class="btn" data-action="open-checkin">Start your first check-in</button></div>
   <div class="range-picker" id="p-ranges" role="group" aria-label="Progress range">
     <button type="button" class="rchip" data-action="set-range" data-r="7" aria-pressed="false">7 days</button>
     <button type="button" class="rchip" data-action="set-range" data-r="14" aria-pressed="false">14 days</button>
@@ -387,6 +393,7 @@ html{background:#060706;}
   <div class="card">
     <div class="rowlink" id="pf-share" tabindex="0" role="button" data-action="open-share"><span>Share my progress</span><span class="sub">→</span></div>
     <div class="rowlink" id="pf-changepw" tabindex="0" role="button" data-action="open-password"><span>Change password</span><span class="sub">→</span></div>
+    <div class="rowlink" id="pf-2fa" tabindex="0" role="button" data-action="open-mfa"><span>Two-factor authentication</span><span class="sub">→</span></div>
     <div class="rowlink" id="pf-logout" tabindex="0" role="button" data-action="logout"><span style="color:var(--danger);">Log out</span><span class="sub">→</span></div>
   </div>
 </section>
@@ -490,6 +497,38 @@ html{background:#060706;}
     <p>Your new password is active. Use it the next time you log in.</p>
     <button class="btn" data-action="close-overlay" data-target="ov-password">Done</button>
   </div>
+</div></div>
+
+<div class="overlay" id="ov-mfa"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mfa-title">
+  <div class="sheet-close" role="button" tabindex="0" data-action="close-overlay" data-target="ov-mfa">Close</div>
+  <h3 class="serif" id="mfa-title" style="margin-top:0;">Two-factor authentication</h3>
+  <div id="mfa-loading" role="status" style="color:var(--sub); font-size:14px;">Loading…</div>
+  <div id="mfa-off" hidden>
+    <p style="color:var(--sub); font-size:14px; line-height:1.6;">Add a second lock to your account. After your password, you enter a 6-digit code from an authenticator app (Google Authenticator, 1Password, Authy…). Optional, and recommended for the creator account.</p>
+    <button class="btn" type="button" data-action="mfa-start">Set up two-factor</button>
+  </div>
+  <div id="mfa-setup" hidden>
+    <p style="color:var(--sub); font-size:14px; line-height:1.6;">1. Scan this QR code with your authenticator app.<br>2. Save the setup key below in your password manager: it is how you get back in if you lose your phone.<br>3. Enter the 6-digit code to turn it on.</p>
+    <div style="display:flex; justify-content:center; margin:10px 0;"><img id="mfa-qr" alt="Authenticator QR code" width="180" height="180" style="background:#fff; border-radius:12px; padding:8px;"></div>
+    <div class="field"><label for="mfa-secret">Setup key</label><input id="mfa-secret" type="text" readonly autocomplete="off" spellcheck="false" style="font-family:monospace; letter-spacing:.06em;"></div>
+    <div class="field"><label for="mfa-code">6-digit code</label><input id="mfa-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456"></div>
+    <button class="btn" type="button" data-action="mfa-confirm" id="mfa-confirm">Turn on</button>
+    <div style="height:8px"></div>
+    <button class="btn secondary" type="button" data-action="mfa-cancel">Cancel</button>
+  </div>
+  <div id="mfa-on" hidden>
+    <p style="color:var(--emerald); font-size:14px; font-weight:600;">Two-factor is on.</p>
+    <div id="mfa-list"></div>
+    <div id="mfa-remove-box" hidden>
+      <div class="field"><label for="mfa-remove-code">Enter a current 6-digit code to remove it</label><input id="mfa-remove-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456"></div>
+      <button class="btn danger" type="button" data-action="mfa-remove-confirm">Remove authenticator</button>
+      <div style="height:8px"></div>
+      <button class="btn secondary" type="button" data-action="mfa-remove-cancel">Keep it</button>
+    </div>
+    <p style="color:var(--sub); font-size:13px; line-height:1.55;">Recovery: add a second authenticator (another phone or a password manager) so losing one device never locks you out.</p>
+    <button class="btn secondary" type="button" data-action="mfa-start">Add another authenticator</button>
+  </div>
+  <div class="err form-err" id="e-mfa" role="alert"></div>
 </div></div>
 
 <div class="overlay" id="ov-renew"><div class="sheet celebrate" role="dialog" aria-modal="true" aria-labelledby="rn-title">

@@ -1,79 +1,80 @@
--- Kawther | creates — Supabase schema (tables, constraints, RLS, RPCs).
--- Run the WHOLE file in the Supabase SQL editor on a fresh project (it is re-runnable).
--- Passwords are NEVER stored here: Supabase Auth owns credentials (auth.users).
+-- Security hardening - CORE (2026-09-30). Apply ONCE, after schema.sql and migrations 2026-09-26 .. 2026-09-29.
+--   * user_achievements / journeys / checkins / checkin_meals: the browser loses ALL direct write privileges.
+--     Writes go only through trusted RPCs that validate, rate-limit and (for achievements) derive from real data.
+--   * new RPCs: update_water_goal, set_post_goal, claim_journey_complete; save_checkin / create_journey / start_next_journey
+--     are rebuilt (SECURITY DEFINER, search_path = '', return {ok,...} JSON so a rate-limit hit is a clean result).
+--   * ALL policies on the six protected tables are dropped and only the intended ones are recreated (deterministic result).
+--   * security_events audit table, per-user sliding-window rate limits, MFA (aal2) enforcement for users who enrolled.
+--   * create_journey / start_next_journey refuse journeys that are already over, and freeze a journey's history once it has check-ins.
+--   * legacy achievement rows are inspected ONCE (see the end of this file): rows with no historical evidence are moved to
+--     private.achievements_quarantine; every row that history supports is kept, even if today's data no longer shows it.
+--
+-- TRANSACTION: the whole file is ONE transaction (begin ... commit) with lock_timeout = 5s. A missing prerequisite, a lock
+-- that cannot be taken within 5s, or a failing smoke test aborts everything - nothing is left half-applied. Run it as a single
+-- execution: psql -v ON_ERROR_STOP=1 -f <this file>, or paste the whole file into ONE SQL-editor run. Do not run it
+-- statement by statement. If a tool leaves the session in an aborted transaction after an error, run ROLLBACK;.
+-- Every statement here is transaction-safe (there is no CREATE INDEX CONCURRENTLY or VACUUM).
+--
+-- RE-RUNNING: apply once. The structural part is idempotent, and the legacy achievement cleanup is guarded by a marker
+-- (private.schema_markers) so it never runs twice - but a re-run is not a supported workflow.
+-- NOT in this file: the optional auth-table audit triggers (2026-09-30b_auth_audit_triggers.sql). Nothing here depends on them.
+-- Older migrations now refuse to run (they would re-open direct writes); apply migrations once, in date order.
 
--- ---------- tables ----------
-create table if not exists public.profiles (
-  id          uuid primary key references auth.users(id) on delete cascade,
-  full_name   text not null default '' check (char_length(full_name) <= 120),
-  email       text not null default '',
-  onboarded   boolean not null default false,
-  created_at  timestamptz not null default now()
-);
+begin;
+set local lock_timeout = '5s';
 
--- One row per journey. Exactly one is active per user (completed_on is null); completed journeys are immutable history.
-create table if not exists public.journeys (
-  id             uuid primary key default gen_random_uuid(),
-  user_id        uuid not null references public.profiles(id) on delete cascade,
-  start_date     date not null,
-  duration_days  int  not null check (duration_days between 7 and 365),
-  start_weight   numeric(5,1) not null check (start_weight between 30 and 300),
-  goal_weight    numeric(5,1) not null check (goal_weight  between 30 and 300),
-  water_goal_ml  int  not null default 2500 check (water_goal_ml between 500 and 6000),
-  -- What she chose after achieving the original goal (the journey itself is never ended or replaced).
-  post_goal_mode text check (post_goal_mode in ('new_goal','maintain','journal')),
-  next_goal_weight numeric(5,1) check (next_goal_weight between 30 and 300),
-  check ((post_goal_mode = 'new_goal') = (next_goal_weight is not null)),
-  completed_on   date,
-  created_at     timestamptz not null default now()
-);
-create unique index if not exists journeys_one_active_per_user on public.journeys (user_id) where completed_on is null;
-create index if not exists journeys_user_start_idx on public.journeys (user_id, start_date);
+-- ---------- prerequisites: fail early with a clear message, never later with an obscure one ----------
+do $$
+declare
+  missing text[] := '{}';
+  need_tables text[] := array['public.profiles', 'public.journeys', 'public.checkins', 'public.checkin_meals',
+                              'public.user_achievements', 'auth.users', 'auth.mfa_factors'];
+  need_cols text[] := array['public.journeys.completed_on', 'public.journeys.post_goal_mode', 'public.journeys.next_goal_weight',
+                            'public.checkins.exercise_unit'];
+  t text; c text; rel text; col text;
+begin
+  foreach t in array need_tables loop
+    if to_regclass(t) is null then missing := array_append(missing, 'table ' || t); end if;
+  end loop;
+  foreach c in array need_cols loop
+    rel := regexp_replace(c, '\.[^.]+$', '');
+    col := regexp_replace(c, '^.*\.', '');
+    if to_regclass(rel) is not null and not exists (
+      select 1 from pg_attribute a where a.attrelid = to_regclass(rel) and a.attname = col and a.attnum > 0 and not a.attisdropped
+    ) then
+      missing := array_append(missing, 'column ' || c);
+    end if;
+  end loop;
+  if to_regclass('public.journeys_one_active_per_user') is null then
+    missing := array_append(missing, 'index public.journeys_one_active_per_user (migration 2026-09-29)');
+  end if;
+  if to_regclass('public.user_achievements') is not null and not exists (
+    select 1 from pg_constraint k
+    where k.conrelid = to_regclass('public.user_achievements') and k.contype = 'c' and pg_get_constraintdef(k.oid) like '%''journey''%'
+  ) then
+    missing := array_append(missing, 'user_achievements check allowing the journey achievement (migration 2026-09-29)');
+  end if;
+  if to_regprocedure('auth.uid()') is null then missing := array_append(missing, 'function auth.uid()'); end if;
+  if to_regprocedure('auth.jwt()') is null then missing := array_append(missing, 'function auth.jwt()'); end if;
+  if cardinality(missing) > 0 then
+    raise exception 'security hardening cannot run - missing prerequisites: %. Apply schema.sql and migrations 2026-09-26 .. 2026-09-29 first. Nothing was changed.',
+      array_to_string(missing, '; ') using errcode = '55000';
+  end if;
+end $$;
 
-create table if not exists public.checkins (
-  id                uuid primary key default gen_random_uuid(),
-  user_id           uuid not null references public.profiles(id) on delete cascade,
-  checkin_date      date not null,
-  mood              text check (mood in ('great','good','okay','tired','low')),
-  weight_kg         numeric(5,1) check (weight_kg between 30 and 300),
-  water_ml          int  not null default 0 check (water_ml between 0 and 20000),
-  exercise_type     text check (char_length(exercise_type) <= 60),
-  exercise_minutes  int  check (exercise_minutes between 0 and 1440),
-  -- the unit the user entered the duration in; minutes are the canonical stored value, the unit is how it is shown back
-  exercise_unit     text not null default 'minutes' check (exercise_unit in ('minutes','hours')),
-  notes             text not null default '' check (char_length(notes) <= 4000),
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now(),
-  unique (user_id, checkin_date),
-  -- lets checkin_meals prove a meal's owner == its check-in's owner (see composite FK below)
-  unique (id, user_id),
-  check ((exercise_type is null) = (exercise_minutes is null))
-);
-
-create table if not exists public.checkin_meals (
-  id          uuid primary key default gen_random_uuid(),
-  checkin_id  uuid not null,
-  user_id     uuid not null references public.profiles(id) on delete cascade,
-  category    text not null check (category in ('breakfast','lunch','dinner','snacks')),
-  name        text not null check (char_length(name) between 1 and 200),
-  notes       text not null default '' check (char_length(notes) <= 1000),
-  eaten_at    time not null,
-  position    int  not null default 0,
-  -- IDOR guard: a meal can only hang off a check-in owned by the SAME user.
-  -- (RLS alone checks user_id; without this a user could point checkin_id at someone else's check-in.)
-  foreign key (checkin_id, user_id) references public.checkins (id, user_id) on delete cascade
-);
-create index if not exists checkin_meals_checkin_idx on public.checkin_meals (checkin_id);
-create index if not exists checkin_meals_user_idx    on public.checkin_meals (user_id);
-
--- Achievement *definitions* live in the app (src/domain/achievements.js); only unlocks are stored, and ONLY the
--- database writes them (derived from the user's real rows by the RPCs below; the browser has no write access).
-create table if not exists public.user_achievements (
-  user_id         uuid not null references public.profiles(id) on delete cascade,
-  achievement_id  text not null check (achievement_id in ('first','d3','d7','d14','hydrated','active','consistent','goal','journey')),
-  unlocked_on     date not null,
-  primary key (user_id, achievement_id)
-);
+-- Decide NOW (before the section below creates the quarantine table) whether the legacy achievement cleanup is still due.
+-- It is due exactly once: never if the marker is set, and never if an earlier revision of this migration already ran it
+-- (that revision created the quarantine table).
+do $$
+declare needed boolean := true;
+begin
+  if to_regclass('private.achievements_quarantine') is not null then
+    needed := false;
+  elsif to_regclass('private.schema_markers') is not null then
+    needed := not exists (select 1 from private.schema_markers m where m.name = 'legacy_achievement_cleanup');
+  end if;
+  perform set_config('kawther.legacy_cleanup', needed::text, true); -- transaction-local
+end $$;
 
 -- >>> SECURITY HARDENING (kept byte-identical in schema.sql and supabase/migrations/2026-09-30_security_hardening.sql; tests enforce it)
 --
@@ -783,84 +784,110 @@ grant execute on function public.claim_journey_complete()                       
 
 -- <<< SECURITY HARDENING
 
--- A fresh database has no legacy achievement rows to inspect, so the one-time legacy cleanup is recorded as already done.
-insert into private.schema_markers (name) values ('legacy_achievement_cleanup') on conflict do nothing;
+-- ---------- one-time legacy achievement cleanup (migration only) ----------
+-- Before this migration a client could INSERT/UPDATE user_achievements directly, so existing rows are untrusted. A row is KEPT
+-- when the user's own HISTORY supports it at (or shortly after) its unlocked_on date; only rows with no such evidence are moved
+-- to private.achievements_quarantine (kept for review, restorable by an admin - never deleted outright).
+-- Evidence is MONOTONIC: it only asks "did the data up to that date ever reach the bar?", never "does today's data still show
+-- it?". So a finished journey's achievements, a goal reached before the weight moved again, a consistency streak that later
+-- dropped, or a hydration streak before the water goal was raised are all preserved. The cutoff is unlocked_on + 1 day (the
+-- same time-zone slack the RPCs use). Limits: if the very row that proved an old achievement has since been overwritten, or
+-- the water goal at unlock time is unknown (hydrated is judged against the 500 ml minimum any goal can have), the evidence
+-- is judged on what remains - which is why rows are quarantined rather than deleted.
+create function private.kc_legacy_supported(p_uid uuid, p_aid text, p_on date) returns boolean
+language plpgsql stable set search_path = '' as $$
+declare cut date := p_on + 1; best int; j public.journeys%rowtype; t date; n int; inj int; dayidx int;
+begin
+  if p_aid = 'first' then
+    return exists (select 1 from public.checkins c where c.user_id = p_uid and c.checkin_date <= cut);
+  elsif p_aid in ('d3', 'd7', 'd14') then
+    select coalesce(max(len), 0) into best from (
+      select count(*) as len from (
+        select c.checkin_date - (row_number() over (order by c.checkin_date))::int as g
+        from public.checkins c where c.user_id = p_uid and c.checkin_date <= cut
+      ) s group by s.g
+    ) r;
+    return best >= case p_aid when 'd3' then 3 when 'd7' then 7 else 14 end;
+  elsif p_aid = 'hydrated' then
+    return (select count(*) from public.checkins c where c.user_id = p_uid and c.checkin_date <= cut and c.water_ml >= 500) >= 7;
+  elsif p_aid = 'active' then
+    return (select count(*) from public.checkins c where c.user_id = p_uid and c.checkin_date <= cut and c.exercise_type is not null) >= 4
+       and coalesce((select max(cnt) from (
+             select (select count(*) from public.checkins c2
+                     where c2.user_id = p_uid and c2.exercise_type is not null and c2.checkin_date <= cut
+                       and c2.checkin_date >= c1.checkin_date and c2.checkin_date < c1.checkin_date + 7) as cnt
+             from public.checkins c1 where c1.user_id = p_uid and c1.checkin_date <= cut) w), 0) >= 4;
+  elsif p_aid = 'consistent' then
+    -- some journey, on some check-in day up to the cutoff, had >= 7 check-ins in total and >= 80% of its days so far checked in
+    for j in select * from public.journeys jj where jj.user_id = p_uid and jj.start_date <= cut loop
+      for t in select distinct c.checkin_date from public.checkins c
+               where c.user_id = p_uid and c.checkin_date >= j.start_date and c.checkin_date <= least(cut, coalesce(j.completed_on, cut))
+      loop
+        select count(*) into n   from public.checkins c where c.user_id = p_uid and c.checkin_date <= t;
+        select count(*) into inj from public.checkins c where c.user_id = p_uid and c.checkin_date >= j.start_date and c.checkin_date <= t;
+        dayidx := greatest(1, least(j.duration_days, (t - j.start_date) + 1));
+        if n >= 7 and round(inj * 100.0 / dayidx) >= 80 then return true; end if;
+      end loop;
+    end loop;
+    return false;
+  elsif p_aid = 'goal' then
+    -- a check-in inside some journey (its own window, not just the active one) reached that journey's goal weight
+    return exists (
+      select 1 from public.journeys jj join public.checkins c
+        on c.user_id = jj.user_id and c.checkin_date >= jj.start_date and c.checkin_date <= least(cut, coalesce(jj.completed_on, cut))
+      where jj.user_id = p_uid and c.weight_kg is not null
+        and ((jj.goal_weight > jj.start_weight and c.weight_kg >= jj.goal_weight)
+          or (jj.goal_weight < jj.start_weight and c.weight_kg <= jj.goal_weight)));
+  elsif p_aid = 'journey' then
+    -- the last day of some journey (finished or active) had arrived by the unlock date
+    return exists (select 1 from public.journeys jj where jj.user_id = p_uid and jj.start_date + (jj.duration_days - 1) <= cut);
+  end if;
+  return false;
+end $$;
 
--- >>> AUTH AUDIT TRIGGERS (OPTIONAL; kept byte-identical in schema.sql and supabase/migrations/2026-09-30b_auth_audit_triggers.sql; tests enforce it)
---
--- Security-event triggers on Supabase-owned auth tables (auth.users, auth.sessions, auth.mfa_factors). They only feed the
--- security_events audit trail (login / password change / reset request / MFA on-off / session revoked). Nothing in the core
--- hardening (RLS, grants, RPCs, achievement protection, rate limits, MFA enforcement) depends on them, so they live apart
--- and their installation can fail without weakening anything. Failure behaviour is explicit: each trigger is installed on
--- its own, a refusal raises a WARNING naming the table, and the remaining triggers are still attempted.
--- Every trigger body swallows its own errors: auditing must never be able to break sign-in, sign-out or MFA.
-create or replace function private.on_auth_user_update() returns trigger
-language plpgsql security definer set search_path = '' as $$
+do $$
+declare moved int := 0;
+begin
+  if current_setting('kawther.legacy_cleanup', true) is distinct from 'true' then
+    raise notice 'kawther: legacy achievement cleanup already done - skipped (nothing quarantined)';
+  else
+    with dead as (
+      delete from public.user_achievements ua
+      where not private.kc_legacy_supported(ua.user_id, ua.achievement_id, ua.unlocked_on)
+      returning ua.user_id, ua.achievement_id, ua.unlocked_on
+    ), q as (
+      insert into private.achievements_quarantine (user_id, achievement_id, unlocked_on)
+      select d.user_id, d.achievement_id, d.unlocked_on from dead d returning 1
+    )
+    select count(*) into moved from q;
+    raise notice 'kawther: legacy achievement cleanup done - % unsupported row(s) quarantined', moved;
+  end if;
+  insert into private.schema_markers (name) values ('legacy_achievement_cleanup') on conflict do nothing;
+end $$;
+drop function private.kc_legacy_supported(uuid, text, date);
+
+-- ---------- smoke test: the security functions must actually RUN here, not merely exist ----------
+-- private.aal_ok() reads auth.mfa_factors as the role applying this migration. If that is not permitted on this project the
+-- error is re-raised (never swallowed) and the whole migration rolls back; the function is not weakened to hide it.
+do $$
+declare ok boolean;
 begin
   begin
-    if new.last_sign_in_at is not null and new.last_sign_in_at is distinct from old.last_sign_in_at then
-      perform private.log_security_event(new.id, 'login');
-    end if;
-    if new.encrypted_password is distinct from old.encrypted_password then
-      perform private.log_security_event(new.id, 'password_change');
-    end if;
-    if new.recovery_sent_at is not null and new.recovery_sent_at is distinct from old.recovery_sent_at then
-      perform private.log_security_event(new.id, 'password_reset_request');
-    end if;
-  exception when others then null;
+    select private.aal_ok() into ok;
+  exception when others then
+    raise exception 'security hardening aborted: private.aal_ok() cannot execute for the migration role (%: %). It reads auth.mfa_factors, so this role needs SELECT on it. Nothing was applied.',
+      sqlstate, sqlerrm using errcode = '42501';
   end;
-  return new;
+  if ok is null then
+    raise exception 'security hardening aborted: private.aal_ok() returned NULL (it must be true or false). Nothing was applied.' using errcode = '55000';
+  end if;
+  if not has_schema_privilege('authenticated', 'private', 'usage') or not has_function_privilege('authenticated', 'private.aal_ok()', 'execute') then
+    raise exception 'security hardening aborted: authenticated cannot execute private.aal_ok(), so every RLS policy would fail. Nothing was applied.' using errcode = '42501';
+  end if;
+  if has_schema_privilege('anon', 'private', 'usage') or has_function_privilege('anon', 'private.aal_ok()', 'execute')
+     or has_table_privilege('authenticated', 'private.achievements_quarantine', 'select') then
+    raise exception 'security hardening aborted: the private schema is reachable by anon/authenticated. Nothing was applied.' using errcode = '42501';
+  end if;
 end $$;
 
-create or replace function private.on_auth_mfa_change() returns trigger
-language plpgsql security definer set search_path = '' as $$
-begin
-  begin
-    if tg_op = 'DELETE' then
-      if old.status = 'verified' then perform private.log_security_event(old.user_id, 'mfa_disabled'); end if;
-    elsif new.status = 'verified' and (tg_op = 'INSERT' or old.status is distinct from 'verified') then
-      perform private.log_security_event(new.user_id, 'mfa_enabled');
-    end if;
-  exception when others then null;
-  end;
-  return coalesce(new, old);
-end $$;
-
-create or replace function private.on_auth_session_delete() returns trigger
-language plpgsql security definer set search_path = '' as $$
-begin
-  begin -- one event per burst (a global sign-out deletes several rows); skipped when the whole account is being deleted
-    if exists (select 1 from auth.users u where u.id = old.user_id) then
-      perform private.log_security_event(old.user_id, 'session_revoked', '{}'::jsonb, interval '1 minute');
-    end if;
-  exception when others then null;
-  end;
-  return old;
-end $$;
-
-revoke all on function private.on_auth_user_update()     from public, anon, authenticated;
-revoke all on function private.on_auth_mfa_change()      from public, anon, authenticated;
-revoke all on function private.on_auth_session_delete()  from public, anon, authenticated;
-
-do $$
-begin
-  if to_regclass('auth.users') is null then raise exception 'no auth.users'; end if;
-  drop trigger if exists kc_auth_user_update on auth.users;
-  create trigger kc_auth_user_update after update on auth.users for each row execute function private.on_auth_user_update();
-exception when others then raise warning 'kawther: audit trigger on auth.users NOT installed (login/password events will not be recorded): %', sqlerrm;
-end $$;
-do $$
-begin
-  if to_regclass('auth.mfa_factors') is null then raise exception 'no auth.mfa_factors'; end if;
-  drop trigger if exists kc_auth_mfa_change on auth.mfa_factors;
-  create trigger kc_auth_mfa_change after insert or update or delete on auth.mfa_factors for each row execute function private.on_auth_mfa_change();
-exception when others then raise warning 'kawther: audit trigger on auth.mfa_factors NOT installed (MFA events will not be recorded): %', sqlerrm;
-end $$;
-do $$
-begin
-  if to_regclass('auth.sessions') is null then raise exception 'no auth.sessions'; end if;
-  drop trigger if exists kc_auth_session_delete on auth.sessions;
-  create trigger kc_auth_session_delete after delete on auth.sessions for each row execute function private.on_auth_session_delete();
-exception when others then raise warning 'kawther: audit trigger on auth.sessions NOT installed (session events will not be recorded): %', sqlerrm;
-end $$;
--- <<< AUTH AUDIT TRIGGERS
+commit;

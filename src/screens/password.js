@@ -6,6 +6,7 @@ import { AuthError } from '../data/errors.js';
 import { reportDataError, MSG } from '../lib/dataError.js';
 import { validatePasswordChange } from '../domain/password.js';
 import { onOverlayClosed, openOverlay } from '../ui/overlays.js';
+import { withBusy } from '../ui/busy.js';
 
 const FIELDS = { current: 'pw-current', next: 'pw-new', confirm: 'pw-confirm' };
 
@@ -47,13 +48,12 @@ export async function savePassword(e) {
   if (firstBad) { $(FIELDS[firstBad]).focus(); return; }
 
   const btn = $('pw-save');
-  btn.disabled = true;
-  btn.textContent = 'Updating…';
+  let failed = true;
+  await withBusy(btn, 'Updating…', async () => {
   try {
     await getRepo().changePassword(values.current, values.next);
+    failed = false;
   } catch (err) {
-    btn.disabled = false;
-    btn.textContent = 'Update password';
     if (err instanceof AuthError && err.code === 'INVALID_CREDENTIALS') {
       setError('current', 'Current password is incorrect.');
       $('pw-current').focus();
@@ -70,8 +70,9 @@ export async function savePassword(e) {
       const code = reportDataError(err, "Couldn't update your password. Please try again.");
       if (code !== 'SESSION_EXPIRED') setFormError("Couldn't update your password. Please try again.");
     }
-    return;
   }
+  });
+  if (failed) return;
   clearAll();
   $('pw-form').hidden = true;
   $('pw-success').hidden = false;

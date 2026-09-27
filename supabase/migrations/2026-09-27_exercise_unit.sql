@@ -1,5 +1,12 @@
 -- Movement duration unit: keep how the user entered it ("1 hr" vs "60 min"). Minutes stay the canonical value.
 -- Run once in the Supabase SQL editor (after schema.sql / earlier migrations). Safe to re-run.
+-- Guard: this migration predates the 2026-09-30 security hardening and would re-open direct table writes / replace hardened RPCs.
+do $$ begin
+  if to_regnamespace('private') is not null then
+    raise exception 'security hardening (2026-09-30) is already applied: do not re-run this older migration';
+  end if;
+end $$;
+
 alter table public.checkins add column if not exists exercise_unit text not null default 'minutes';
 alter table public.checkins drop constraint if exists checkins_exercise_unit_check;
 alter table public.checkins add constraint checkins_exercise_unit_check check (exercise_unit in ('minutes','hours'));

@@ -18,9 +18,9 @@ import { maybeCelebrateJourneyComplete } from '../ui/journeyComplete.js';
 const CHOICES = [['new_goal', 'Set a new goal'], ['maintain', 'Maintain'], ['journal', 'Keep journaling']];
 
 export function enterHome() {
+  renderHome(); // fully rendered from the loaded user BEFORE the screen is shown: no empty shell, ever
   showNav(true);
   tab('s-home');
-  renderHome();
   maybeCelebrateJourneyComplete();
 }
 
@@ -60,7 +60,6 @@ function renderCheckinCard(user, today) {
     summary.innerHTML = '';
     $('h-ci-cta').className = 'ci-cta';
     $('h-ci-cta').innerHTML = (first ? 'Begin' : 'Check in') + ' ' + ARROW_SVG;
-    card.setAttribute('aria-label', first ? 'Begin your first check-in' : 'Start today\'s check-in');
     return;
   }
   const goal = waterGoalOf(user.journey);
@@ -77,7 +76,6 @@ function renderCheckinCard(user, today) {
   ].join('');
   $('h-ci-cta').className = 'ci-cta edit';
   $('h-ci-cta').innerHTML = 'Edit check-in ' + ARROW_SVG;
-  card.setAttribute('aria-label', "Edit today's check-in");
 }
 
 /** "Renew your streak": a motivational confirmation; the real streak restarts with the next saved check-in. */
@@ -129,6 +127,7 @@ function dayLabel(user, day, dur, today) {
 
 export function renderHome() {
   const { user } = state;
+  if (!user || !user.journey) return; // not loaded is not the same as empty: never render a half-state
   const today = todayStr();
   $('h-name').textContent = user.name;
   const hr = new Date().getHours();

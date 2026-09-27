@@ -10,6 +10,7 @@ import { getRepo } from '../data/repository.js';
 import { goalAchievement, goalCopy, parseNextGoal } from '../domain/goal.js';
 import { PHASE_MS, createSequence, phasesFor } from '../domain/goalSequence.js';
 import { closeOverlay, onOverlayClosed, openOverlay } from './overlays.js';
+import { isBusy, withBusy } from './busy.js';
 import { renderHome } from '../screens/home.js';
 
 const ID = 'ov-reached';
@@ -113,9 +114,9 @@ export function goalSkip() {
 export const replayGoal = () => showGoalExperience({ replay: true });
 
 /** Persists her choice, updates the working copy, and returns to Home. */
-export async function applyPostGoal(mode, nextGoal = null) {
+export async function applyPostGoal(mode, nextGoal = null, btn = null) {
   try {
-    await getRepo().setPostGoal(mode, nextGoal);
+    await withBusy(btn, 'Saving…', () => getRepo().setPostGoal(mode, nextGoal));
   } catch (e) {
     reportDataError(e, "Couldn't save your choice. Please try again.");
     return false;
@@ -129,7 +130,8 @@ export async function applyPostGoal(mode, nextGoal = null) {
 }
 
 /** From the choices (in the overlay or from Home): new goal opens the weight form, the others save straight away. */
-export async function chooseGoalMode(mode) {
+export async function chooseGoalMode(mode, btn = null) {
+  if (isBusy(btn)) return;
   if (mode === 'new_goal') {
     if (!$(ID).classList.contains('show')) showGoalExperience({ choicesOnly: true });
     $('rc-options').hidden = true;
@@ -140,7 +142,7 @@ export async function chooseGoalMode(mode) {
     input.focus();
     return;
   }
-  if (await applyPostGoal(mode)) closeOverlay(ID);
+  if (await applyPostGoal(mode, null, btn)) closeOverlay(ID);
 }
 
 export async function onNewGoalSubmit(e) {
@@ -149,7 +151,9 @@ export async function onNewGoalSubmit(e) {
   $('rc-newgoal-err').textContent = r.ok ? '' : r.error;
   $('rc-newgoal-input').setAttribute('aria-invalid', String(!r.ok));
   if (!r.ok) return;
-  if (await applyPostGoal('new_goal', r.value)) closeOverlay(ID);
+  const submit = $('rc-newgoal-save');
+  if (isBusy(submit)) return;
+  if (await applyPostGoal('new_goal', r.value, submit)) closeOverlay(ID);
 }
 
 onOverlayClosed(ID, () => {

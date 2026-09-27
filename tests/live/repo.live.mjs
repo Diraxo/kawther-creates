@@ -36,25 +36,26 @@ check('wrong password -> INVALID_CREDENTIALS', await (async () => { try { await 
 
 await a.createJourney({ start: addDays(today, -1), duration: 60, startWeight: 72, goalWeight: 62, waterGoal: 2500 });
 await a.updateWaterGoal(3000);
-await a.saveCheckin(addDays(today, -1), ci({ water: 3100, weight: 72 }));
-await a.saveCheckin(today, ci());
-await a.saveCheckin(today, ci({ water: 3200, meals: meals('Chicken') })); // update same day: no duplicate
-await a.unlockAchievement('first', today);
-await a.unlockAchievement('d3', today);
-await a.unlockAchievement('d3', today); // idempotent
+await a.saveCheckin(addDays(today, -2), ci({ water: 3100, weight: 72 }));
+const s1 = await a.saveCheckin(addDays(today, -1), ci({ water: 3100, weight: 72 }));
+const s2 = await a.saveCheckin(today, ci());
+const s3 = await a.saveCheckin(today, ci({ water: 3200, meals: meals('Chicken') })); // update same day: no duplicate
+// Achievements are granted by the DATABASE from the saved rows (the browser can no longer write them): First Step with the
+// first check-in of "today", the 3-day streak once three consecutive days exist, and never twice.
+check('server grants First Step, then the 3-Day Streak, exactly once each', s1.unlocked.map((u) => u.id).join() === 'first' && s2.unlocked.map((u) => u.id).join() === 'd3' && s3.unlocked.length === 0, JSON.stringify([s1, s2, s3]));
 
 let s = await a.getSession();
 check('reload: onboarded + journey persisted', s.onboarded && s.journey.duration === 60 && s.journey.waterGoal === 3000);
-check('reload: 2 check-ins (update did not duplicate)', Object.keys(s.checkins).length === 2);
+check('reload: 3 check-ins (update did not duplicate)', Object.keys(s.checkins).length === 3);
 check('reload: today updated to 3.2 L and meal replaced', s.checkins[today].water === 3200 && s.checkins[today].meals.dinner.length === 1 && s.checkins[today].meals.dinner[0].name === 'Chicken');
 check('reload: weight / mood / exercise / notes round-trip', s.checkins[today].weight === 71.5 && s.checkins[today].mood === 'great' && s.checkins[today].exercise.type === 'Running' && s.checkins[today].notes === 'live test');
-check('reload: achievements persisted once each', s.unlocked.length === 2 && s.unlockedDates.first === today);
+check('reload: achievements persisted once each, dated by the server', s.unlocked.length === 2 && s.unlockedDates.first === addDays(today, -1) && s.unlockedDates.d3 === today);
 
 console.log('\nFresh login (new client = new browser) sees the same data');
 await a.signOut();
 const a2 = mk();
 s = await a2.signIn(emailA, pass);
-check('login again: all data remains', Object.keys(s.checkins).length === 2 && s.unlocked.length === 2 && s.journey.waterGoal === 3000);
+check('login again: all data remains', Object.keys(s.checkins).length === 3 && s.unlocked.length === 2 && s.journey.waterGoal === 3000);
 
 console.log('\nAtomicity: a rejected save changes nothing');
 const before = (await a2.getSession()).checkins[today];
@@ -91,7 +92,7 @@ const anon = createClient(URL_, KEY);
 check('unauthenticated (anon key only) reads nothing', (await count(anon.from('checkins').select('*'))) === 0 && (await count(anon.from('profiles').select('*'))) === 0);
 check('unauthenticated cannot call save_checkin', (await anon.rpc('save_checkin', { p_date: today, p_checkin: {} })).error !== null);
 const still = await a2.getSession();
-check("A's data is completely intact after all of B's attacks", still.checkins[today].water === 3200 && Object.keys(still.checkins).length === 2 && still.unlocked.length === 2);
+check("A's data is completely intact after all of B's attacks", still.checkins[today].water === 3200 && Object.keys(still.checkins).length === 3 && still.unlocked.length === 2);
 console.log('\nMovement duration unit + one-row-per-day');
 const notVerified = [];
 const { error: unitErr } = await a2.sb.from('checkins').select('exercise_unit').limit(1);

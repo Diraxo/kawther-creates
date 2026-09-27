@@ -6,6 +6,9 @@ import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { addDays, todayStr } from '../../src/domain/dates.js';
+import { findNewUnlocks } from '../../src/domain/achievements.js';
+import { goalAchievement } from '../../src/domain/goal.js';
+import { isJourneyEnded } from '../../src/domain/journeyComplete.js';
 
 const PORT = 5179;
 const MOCK = 'http://mock.local';
@@ -48,21 +51,57 @@ async function mockSupabase(ctx) {
     const single = (req.headers().accept || '').includes('vnd.pgrst.object');
     const table = url.pathname.replace('/rest/v1/', '');
     if (url.pathname.startsWith('/auth/v1')) return json({}, 200);
-    if (url.pathname.startsWith('/rest/v1/rpc/save_checkin')) {
-      const { p_date, p_checkin } = JSON.parse(req.postData());
-      db.checkins = db.checkins.filter((c) => c.checkin_date !== p_date);
-      db.checkins.push({ id: 'c-' + p_date, user_id: uid, checkin_date: p_date, mood: p_checkin.mood, weight_kg: p_checkin.weight_kg, water_ml: p_checkin.water_ml, exercise_type: p_checkin.exercise_type, exercise_minutes: p_checkin.exercise_minutes, exercise_unit: p_checkin.exercise_unit, notes: p_checkin.notes });
-      return json('c-' + p_date);
+    // The browser has no table-write privilege in the real database; every write is an RPC. This mock plays the SERVER:
+    // it applies the write and DERIVES achievements from its own rows with the same rules the SQL implements
+    // (tests/integration/security.test.js proves SQL == these rules on 250 random histories).
+    if (url.pathname.startsWith('/rest/v1/rpc/')) {
+      const name = url.pathname.split('/').pop();
+      const args = req.postData() ? JSON.parse(req.postData()) : {};
+      db.writes.push({ method: 'RPC', table: 'rpc/' + name, body: args });
+      const j = db.journey;
+      const asUser = () => ({
+        journey: { start: j.start_date, duration: j.duration_days, startWeight: j.start_weight, goalWeight: j.goal_weight, waterGoal: j.water_goal_ml },
+        checkins: Object.fromEntries(db.checkins.map((c) => [c.checkin_date, { weight: c.weight_kg, water: c.water_ml, exercise: c.exercise_type ? { type: c.exercise_type } : null }])),
+        unlocked: db.achievements.map((a) => a.achievement_id),
+        unlockedDates: Object.fromEntries(db.achievements.map((a) => [a.achievement_id, a.unlocked_on])),
+      });
+      const grant = (list, dateOf) => list.map((a) => {
+        const on = dateOf(a);
+        db.achievements = db.achievements.filter((x) => x.achievement_id !== a.id);
+        db.achievements.push({ user_id: uid, achievement_id: a.id, unlocked_on: on });
+        return { id: a.id, on };
+      });
+      if (name === 'save_checkin') {
+        const { p_date, p_checkin } = args;
+        db.checkins = db.checkins.filter((c) => c.checkin_date !== p_date);
+        db.checkins.push({ id: 'c-' + p_date, user_id: uid, checkin_date: p_date, mood: p_checkin.mood, weight_kg: p_checkin.weight_kg, water_ml: p_checkin.water_ml, exercise_type: p_checkin.exercise_type, exercise_minutes: p_checkin.exercise_minutes, exercise_unit: p_checkin.exercise_unit, notes: p_checkin.notes });
+        const fresh = findNewUnlocks(asUser(), p_date);
+        const unlocked = grant(fresh, (a) => (a.id === 'goal' ? goalAchievement(asUser()).date : p_date));
+        return json({ ok: true, id: 'c-' + p_date, unlocked });
+      }
+      if (name === 'claim_journey_complete') {
+        const u = asUser();
+        const unlocked = !u.unlocked.includes('journey') && isJourneyEnded(u.journey, today)
+          ? grant([{ id: 'journey' }], () => addDays(j.start_date, j.duration_days - 1)) : [];
+        return json({ ok: true, unlocked });
+      }
+      if (name === 'set_post_goal') {
+        if (!db.achievements.some((a) => a.achievement_id === 'goal')) return json({ code: 'P0001', message: 'goal not reached' }, 400);
+        j.post_goal_mode = args.p_mode;
+        j.next_goal_weight = args.p_mode === 'new_goal' ? args.p_next : null;
+        return json({ ok: true });
+      }
+      if (name === 'update_water_goal') { j.water_goal_ml = args.p_ml; return json({ ok: true }); }
+      return json({ ok: true });
     }
     if (req.method() === 'GET') {
       const rows = { profiles: [{ id: uid, full_name: 'Kawther Ali', email: 'k@example.com', onboarded: true }], journeys: [db.journey], checkins: db.checkins, checkin_meals: [], user_achievements: db.achievements }[table] || [];
       return json(single ? rows[0] : rows);
     }
     const body = req.postData() ? JSON.parse(req.postData()) : {};
+    // Any direct table write is refused, exactly like the real database (no INSERT/UPDATE/DELETE privilege).
     db.writes.push({ method: req.method(), table, body });
-    if (table === 'user_achievements') { db.achievements = db.achievements.filter((a) => a.achievement_id !== body.achievement_id); db.achievements.push(body); return json([body], 201); }
-    if (table === 'journeys' && req.method() === 'PATCH') { Object.assign(db.journey, body); return json([{ id: 'j1' }]); }
-    return json([]);
+    return json({ code: '42501', message: 'permission denied for table ' + table }, 403);
   });
 }
 

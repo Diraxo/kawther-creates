@@ -23,14 +23,16 @@ src/data/             repository interface + the Supabase adapter (below)
 src/screens/          one module per screen
 src/ui/, src/lib/     router, theme, overlays, chart, toast, motion, icons, formatting
 src/styles/           the app CSS, split into contiguous slices (cascade order preserved)
-supabase/schema.sql   tables, constraints, RLS, profile trigger
+supabase/schema.sql   tables, constraints, RLS, trusted RPCs, rate limits, security events (single source of truth)
+docs/                 SECURITY_DEPLOYMENT_CHECKLIST.md (dashboard steps) and SECURITY_MODEL.md (what is enforced where)
 tests/unit, tests/e2e node:test + Playwright
 ```
 
 ## Data layer / Supabase
 
 Screens never touch storage; they call `getRepo()` (`src/data/repository.js`), an async interface:
-`getSession, signUp, signIn, signOut, changePassword, createJourney, updateWaterGoal, saveCheckin, unlockAchievement`.
+`getSession, signUp, signIn, verifyMfaLogin, signOut, changePassword, mfa*, createJourney, updateWaterGoal, setPostGoal, startNextJourney, saveCheckin, claimJourneyComplete`.
+Every write is a trusted RPC (the browser has no table-write privilege); achievements are granted by the database, never sent by the browser.
 
 `SupabaseRepository` is the only backend (Supabase Auth + Postgres under RLS). There is no local/offline fallback: if
 Supabase is unreachable the app says so and nothing is shown as saved. The only browser storage used is the Supabase
@@ -44,7 +46,10 @@ session (managed by supabase-js) and the `kc_theme` appearance preference.
 3. `cp .env.example .env`, then set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
    (**anon** key only; the `service_role` key must never be used in this app). `.env` is git-ignored. Restart `npm run dev`.
    Missing variables are reported on screen at boot ("isn't configured correctly") — nothing fails silently.
-4. Upgrading a project that already ran an older `schema.sql`, run the migrations in `supabase/migrations/` in date order.
+4. Upgrading a project that already ran an older `schema.sql`, run the migrations in `supabase/migrations/` in date order, **once each**.
+   **`2026-09-30_security_hardening.sql` is required before the current app works** (the app now calls RPCs that migration creates).
+   Then follow `docs/SECURITY_DEPLOYMENT_CHECKLIST.md` for what only the Supabase/Vercel dashboards can enable (Turnstile secret, Auth rate limits,
+   password policy, MFA, Vercel firewall). Environment variables are listed in `.env.example`; only `VITE_*` (browser-safe) values belong there.
    **`2026-09-27_exercise_unit.sql` is required for movement durations entered in hours** ("1 hr" stays "1 hr"); without it the
    app still works but a duration is shown back in minutes after a reload. Older still: run `supabase/migrations/2026-09-26_drop_seed_demo.sql`
    (removes the old demo seeder) and delete the old `demo@kawthercreates.com` user in Auth → Users.
@@ -54,10 +59,12 @@ session (managed by supabase-js) and the `kc_theme` appearance preference.
 `checkins` (unique per user+date), `checkin_meals` (composite FK `(checkin_id,user_id)` → `checkins(id,user_id)`, so a meal
 can never be attached to another user's check-in), `user_achievements` (unlock rows only; definitions live in code).
 There is **no** password column anywhere — Supabase Auth owns credentials.
-RLS is on for all five tables; every policy is `to authenticated` and scoped to `auth.uid()`; table privileges are revoked from
-`anon` and re-granted minimally (no client DELETE except a day's meals; profiles' `email`/`id` are not client-editable).
-Two `SECURITY INVOKER` RPCs (they run as the caller, so RLS still applies to every statement):
-`save_checkin` (upsert day + replace meals, **one transaction**) and `create_journey` (journey + onboarded flag, atomic).
+RLS is on for every table; every policy is `to authenticated` and scoped to `auth.uid()`. The browser can only **SELECT** its own rows
+(plus update `profiles.full_name`); `anon` has no access. All writes go through hardened `SECURITY DEFINER` RPCs (`search_path = ''`, owner from
+`auth.uid()` only, `EXECUTE` for `authenticated` only) that validate every field, enforce volume limits and per-user sliding-window rate limits, and
+derive achievements from the saved rows: `save_checkin`, `create_journey`, `start_next_journey`, `update_water_goal`, `set_post_goal`, `claim_journey_complete`.
+`security_events` is an append-only audit trail (users can read their own). Opt-in TOTP two-factor is enforced by the database once a user enrols.
+See `docs/SECURITY_MODEL.md`. Security tests: `npm run test:security` (no network), `npm run test:headers`, and `npm run test:live` (real project).
 
 ### Product rules (one implementation, used by every screen)
 - **Day 1 = the start date.** Goal date = start + (duration − 1) (`goalDate()` in `src/domain/journey.js`); all dates are local calendar days, never UTC.
@@ -76,6 +83,14 @@ faked network: outages, RLS rejections, expired sessions) · `npm run test:live`
 the full browser account flow, and the splash/responsive/empty-state audit; creates throw-away `kc.test.*` accounts) ·
 `npm run test:ux` (real project: the Home/check-in/streak/progress/graph/journey/profile/share/logout/password behaviours and a
 11-width responsive audit; unit persistence is reported NOT VERIFIED until the exercise_unit migration is applied).
+
+`npm run test:lifecycle` (browser, in-memory Supabase stand-in at the network boundary; no live project needed): splash-first
+startup frame by frame, offline/500/slow-network states, first-navigation rendering (with CSS animations frozen, the iOS failure
+class), Home hydration, last-weight default, hydration layout, loading buttons + double-tap protection, offline banner, 11 widths.
+
+App lifecycle: `state.status` is `booting → loading → ready | signed-out | error`. Screens render only from a fully loaded user
+("not loaded" is never drawn as "empty"); entrance animations are decoration only (resting state is visible); every async
+button goes through `ui/busy.js`; connection state lives in `ui/network.js`.
 
 Known limits: theme stays a per-device localStorage preference; achievements are computed by the client and stored by it, so a
 user can grant *themselves* achievements (affects only their own data).

@@ -4,6 +4,7 @@ import { state } from '../state.js';
 import { todayStr } from '../domain/dates.js';
 import { shareStats } from '../domain/metrics.js';
 import { openOverlay } from '../ui/overlays.js';
+import { withBusy } from '../ui/busy.js';
 
 /** [{ key, label }] for the metrics that really exist. */
 export function shareRows(s) {
@@ -77,8 +78,12 @@ function download(blob, name) {
 }
 
 /** Always-available alternative: download the card as a PNG. Only claims success once the download was triggered. */
-export async function saveShareImage() {
+export function saveShareImage(btn) {
   if (!current) return;
+  return withBusy(btn, 'Creating image…', makeImage);
+}
+
+async function makeImage() {
   try {
     const blob = await renderPng(current.s, current.rows);
     if (!blob) throw new Error('no image');
@@ -94,12 +99,14 @@ export async function saveShareImage() {
  * Web Share API when available (with the PNG if the browser can share files), else a graceful fallback.
  * Success is only ever reported for a promise that actually resolved; a cancelled or rejected share is not "shared".
  */
-export async function doShare() {
+export function doShare(btn) {
   if (!current) return;
+  return withBusy(btn || $('sh-share-btn'), 'Preparing…', shareCurrent);
+}
+
+async function shareCurrent() {
   const { s, rows } = current;
   const text = shareText(s, rows);
-  const btn = $('sh-share-btn');
-  btn.disabled = true;
   status('Preparing your card…');
   try {
     const blob = await renderPng(s, rows);
@@ -131,7 +138,5 @@ export async function doShare() {
   } catch (e) {
     console.error(e);
     status("Couldn't create the share card. Please try again.", 'error');
-  } finally {
-    btn.disabled = false;
   }
 }

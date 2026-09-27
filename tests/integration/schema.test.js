@@ -19,11 +19,16 @@ before(async () => {
   await db.exec(`
     create role anon nologin; create role authenticated nologin;
     create schema auth;
-    create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb);
+    create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb,
+      encrypted_password text, last_sign_in_at timestamptz, recovery_sent_at timestamptz);
+    create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade);
+    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null, status text not null default 'unverified');
     create function auth.uid() returns uuid language sql stable
       as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+    create function auth.jwt() returns jsonb language sql stable
+      as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
     grant usage on schema auth, public to anon, authenticated;
-    grant execute on function auth.uid() to anon, authenticated;
+    grant execute on function auth.uid(), auth.jwt() to anon, authenticated;
   `);
   await db.exec(SCHEMA);
   await db.exec(`
@@ -40,6 +45,10 @@ async function as(uid, fn) {
   try { return await fn(); } finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`); }
 }
 const denied = (p) => assert.rejects(p, /permission denied|row-level security|violates|not authenticated/i);
+/** A write the browser must not be able to make: either refused outright (no privilege) or it matches 0 rows. Never a change. */
+const noEffect = async (p) => {
+  try { assert.equal((await p).affectedRows, 0); } catch (e) { assert.match(String(e.message), /permission denied|row-level security/i); }
+};
 const payload = (over = {}) => ({
   mood: 'good', weight_kg: 70.5, water_ml: 2000, exercise_type: 'Gym', exercise_minutes: 30, notes: 'n',
   meals: [
@@ -48,6 +57,7 @@ const payload = (over = {}) => ({
   ],
   ...over,
 });
+const todayPlus = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 const save = (uid, date, p) => as(uid, () => db.query('select public.save_checkin($1::date, $2::jsonb) as id', [date, JSON.stringify(p)]));
 
 test('signup trigger creates a profile from auth.users (no password column anywhere in public)', async () => {
@@ -65,7 +75,7 @@ test('anon can read/write nothing, and cannot call the RPCs', async () => {
 });
 
 test('journey: create_journey is atomic + sets onboarded; users see only their own', async () => {
-  await as(A, () => db.query(`select public.create_journey('2026-09-01', 90, 72, 62, 2500)`));
+  await as(A, () => db.query(`select public.create_journey(current_date, 90, 72, 62, 2500)`));
   await as(B, () => db.query(`select public.create_journey('2026-09-10', 30, 90, 80, 3000)`));
   assert.equal((await as(A, () => db.query('select * from public.journeys'))).rows.length, 1);
   assert.equal((await as(A, () => db.query('select onboarded from public.profiles'))).rows[0].onboarded, true);
@@ -78,7 +88,7 @@ test('journey: create_journey is atomic + sets onboarded; users see only their o
 
 test('journey: any custom length 7..365 is accepted', async () => {
   for (const d of [7, 45, 120, 365]) {
-    await as(A, () => db.query(`select public.create_journey('2026-09-01', ${d}, 72, 62, 2500)`));
+    await as(A, () => db.query(`select public.create_journey(current_date, ${d}, 72, 62, 2500)`));
     assert.equal((await as(A, () => db.query('select duration_days from public.journeys'))).rows[0].duration_days, d);
   }
   await as(A, () => db.query(`select public.create_journey('2026-09-01', 90, 72, 62, 2500)`));
@@ -125,13 +135,10 @@ test('RLS/IDOR: B cannot read, update, delete or forge rows belonging to A', asy
   assert.equal((await as(B, () => db.query('select * from public.checkin_meals where checkin_id = $1', [aCheckin]))).rows.length, 0);
   assert.equal((await as(B, () => db.query('select * from public.profiles where id = $1', [A]))).rows.length, 0);
   assert.equal((await as(B, () => db.query('select * from public.journeys where user_id = $1', [A]))).rows.length, 0);
-  // updates/deletes silently affect 0 rows
-  const upd = await as(B, () => db.query(`update public.checkins set water_ml = 0 where id = $1`, [aCheckin]));
-  assert.equal(upd.affectedRows, 0);
-  const del = await as(B, () => db.query(`delete from public.checkin_meals where checkin_id = $1`, [aCheckin]));
-  assert.equal(del.affectedRows, 0);
-  const upj = await as(B, () => db.query(`update public.journeys set water_goal_ml = 500 where user_id = $1`, [A]));
-  assert.equal(upj.affectedRows, 0);
+  // updates/deletes never change anything (now refused outright: the browser has no write privilege on these tables)
+  await noEffect(as(B, () => db.query(`update public.checkins set water_ml = 0 where id = $1`, [aCheckin])));
+  await noEffect(as(B, () => db.query(`delete from public.checkin_meals where checkin_id = $1`, [aCheckin])));
+  await noEffect(as(B, () => db.query(`update public.journeys set water_goal_ml = 500 where user_id = $1`, [A])));
   const upp = await as(B, () => db.query(`update public.profiles set full_name = 'pwned' where id = $1`, [A]));
   assert.equal(upp.affectedRows, 0);
   await save(B, '2026-09-02', payload()); // B has a row of their own, so the reassignment below is a real attack
@@ -148,9 +155,14 @@ test('IDOR via foreign key: B cannot attach a meal to A\'s check-in (composite F
   await as(B, async () => {
     await assert.rejects(
       db.query(`insert into public.checkin_meals (checkin_id, user_id, category, name, eaten_at) values ($1, '${B}', 'lunch', 'injected', '12:00')`, [aCheckin]),
-      /foreign key|violates/i,
+      /foreign key|violates|permission denied/i,
     );
   });
+  // and the composite FK holds on its own, even for the table owner (defence in depth: not just a missing privilege)
+  await assert.rejects(
+    db.query(`insert into public.checkin_meals (checkin_id, user_id, category, name, eaten_at) values ($1, '${B}', 'lunch', 'injected', '12:00')`, [aCheckin]),
+    /foreign key/i,
+  );
   assert.equal((await db.query(`select 1 from public.checkin_meals where name='injected'`)).rows.length, 0);
 });
 
@@ -162,10 +174,14 @@ test('profiles: users cannot change email/id, insert or delete profiles', async 
   await denied(as(A, () => db.query(`delete from public.journeys`)));
 });
 
-test('achievements: own rows only; unknown ids rejected', async () => {
-  await as(A, () => db.query(`insert into public.user_achievements values ('${A}', 'first', '2026-09-02')`));
+// The browser has no write privilege on user_achievements at all (see tests/integration/security.test.js for the full attack
+// matrix). Legitimate unlocks come from save_checkin, derived from the user's real rows.
+test('achievements: derived by save_checkin from real data; own rows only; ids are constrained', async () => {
+  await save(A, todayPlus(0), payload());
+  assert.deepEqual((await as(A, () => db.query('select achievement_id from public.user_achievements'))).rows.map((r) => r.achievement_id), ['first']);
   assert.equal((await as(B, () => db.query('select * from public.user_achievements'))).rows.length, 0);
-  await assert.rejects(as(A, () => db.query(`insert into public.user_achievements values ('${A}', 'godmode', '2026-09-02')`)), /violates/);
+  await denied(as(A, () => db.query(`insert into public.user_achievements values ('${A}', 'first', '2026-09-02')`)));
+  await assert.rejects(db.query(`insert into public.user_achievements values ('${A}', 'godmode', '2026-09-02')`), /violates/); // table constraint, even for the owner
 });
 
 // ---------- exercise unit (movement duration: minutes canonical + the unit the user entered) ----------
@@ -181,41 +197,33 @@ test('exercise_unit: hours/minutes persist through save_checkin; a re-save updat
   await assert.rejects(save(A, '2026-09-12', payload({ exercise_unit: 'days' })), /violates|check/i);
 });
 
-test('migration 2026-09-27_exercise_unit.sql is re-runnable and keeps save_checkin working', async () => {
-  const mig = readFileSync(new URL('../../supabase/migrations/2026-09-27_exercise_unit.sql', import.meta.url), 'utf8');
-  await db.exec(mig);
-  await db.exec(mig);
-  await save(A, '2026-09-13', payload({ exercise_minutes: 60, exercise_unit: 'hours' }));
-  assert.equal((await as(A, () => db.query(`select exercise_unit from public.checkins where checkin_date='2026-09-13'`))).rows[0].exercise_unit, 'hours');
-});
-
 // ---------- goal achievement ----------
-test('goal achievement: post-goal choice is constrained, user-scoped, reset by create_journey; goal achievement allowed', async () => {
+// (the 2026-09-27/28/29 migration re-run tests live in tests/integration/upgrade.test.js: they need the pre-hardening shape)
+test('goal achievement: post-goal choice needs a server-derived goal, is constrained, user-scoped, reset by create_journey', async () => {
   await as(CAROL, () => db.query(`select public.create_journey('2026-09-01'::date, 60, 48, 65, 2500)`));
-  const set = (mode, w) => as(CAROL, () => db.query(`update public.journeys set post_goal_mode=$1, next_goal_weight=$2 where user_id=$3`, [mode, w, CAROL]));
+  const set = (mode, w) => as(CAROL, () => db.query(`select public.set_post_goal($1, $2)`, [mode, w]));
+  // not reached yet: the choice cannot be made (and cannot be forged by writing the columns directly)
+  await assert.rejects(set('maintain', null), /goal not reached/);
+  await noEffect(as(CAROL, () => db.query(`update public.journeys set post_goal_mode='maintain' where user_id=$1`, [CAROL])));
+  // reach it for real: a check-in at/above the goal weight (a GAIN journey 48 -> 65)
+  await save(CAROL, todayPlus(0), payload({ weight_kg: 65.2 }));
+  assert.deepEqual((await as(CAROL, () => db.query(`select achievement_id from public.user_achievements order by 1`))).rows.map((r) => r.achievement_id), ['first', 'goal']);
   await set('new_goal', 68);
   await set('maintain', null);
   await set('journal', null);
-  await assert.rejects(set('new_goal', null), /violates|check/i);
-  await assert.rejects(set('maintain', 70), /violates|check/i);
-  await assert.rejects(set('sprint', null), /violates|check/i);
-  await assert.rejects(set('new_goal', 500), /violates|check/i);
-  const other = await as(B, () => db.query(`update public.journeys set post_goal_mode='maintain' where user_id=$1`, [CAROL]));
-  assert.equal(other.affectedRows, 0);
-  await as(CAROL, () => db.query(`insert into public.user_achievements values ($1, 'goal', '2026-09-30')`, [CAROL]));
-  await assert.rejects(as(CAROL, () => db.query(`insert into public.user_achievements values ($1, 'bogus', '2026-09-30')`, [CAROL])), /violates|check/i);
+  await assert.rejects(set('new_goal', null), /invalid goal weight/);
+  await assert.rejects(set('maintain', 70), /invalid goal weight/);
+  await assert.rejects(set('sprint', null), /invalid mode/);
+  await assert.rejects(set('new_goal', 500), /invalid goal weight/);
+  await assert.rejects(set('new_goal', 65), /already reached/);
+  // another user cannot touch CAROL's choice: they have no goal of their own
+  await assert.rejects(as(B, () => db.query(`select public.set_post_goal('maintain', null)`)), /goal not reached/);
+  assert.equal((await db.query(`select post_goal_mode from public.journeys where user_id=$1`, [CAROL])).rows[0].post_goal_mode, 'journal');
   await set('new_goal', 68);
-  await as(CAROL, () => db.query(`select public.create_journey('2026-10-01'::date, 30, 60, 70, 2500)`));
+  // (a journey that already has check-ins keeps its start date and starting weight; its goal may still change to an unreached one)
+  await as(CAROL, () => db.query(`select public.create_journey('2026-09-01'::date, 60, 48, 70, 2500)`));
   const r = (await as(CAROL, () => db.query(`select post_goal_mode, next_goal_weight from public.journeys where user_id=$1`, [CAROL]))).rows[0];
   assert.deepEqual(r, { post_goal_mode: null, next_goal_weight: null });
-});
-
-test('migration 2026-09-28_goal_achievement.sql is re-runnable on top of the schema', async () => {
-  const mig = readFileSync(new URL('../../supabase/migrations/2026-09-28_goal_achievement.sql', import.meta.url), 'utf8');
-  await db.exec(mig);
-  await db.exec(mig);
-  await as(CAROL, () => db.query(`update public.journeys set post_goal_mode='maintain', next_goal_weight=null where user_id=$1 and completed_on is null`, [CAROL]));
-  await assert.rejects(as(CAROL, () => db.query(`update public.journeys set post_goal_mode='new_goal' where user_id=$1 and completed_on is null`, [CAROL])), /violates|check/i);
 });
 
 // ---------- journey complete ----------
@@ -224,21 +232,24 @@ const DAVE = '44444444-4444-4444-4444-444444444444';
 test('journey complete: start_next_journey archives the finished journey, keeps it immutable, one active at a time', async () => {
   await db.exec(`insert into auth.users values ('${DAVE}', 'dave@example.com', '{"full_name":"Dave"}')`);
   const q = (sql, args) => as(DAVE, () => db.query(sql, args));
-  await q(`select public.create_journey('2020-01-01'::date, 60, 48, 65, 2500)`); // last day 2020-02-29
+  await q(`select public.create_journey(current_date, 60, 48, 65, 2500)`);
+  // arrange a journey that finished yesterday (owner-level fixture: create_journey refuses a journey that is already over)
+  await db.query(`update public.journeys set start_date = $2 where user_id = $1`, [DAVE, todayPlus(-60)]); // last day = yesterday
   const next = (start, mode = 'new_goal', goal = 62) => q(`select public.start_next_journey($1::date, 90, 65, $2, 2500, $3)`, [start, goal, mode]);
-  await assert.rejects(next('2020-02-29'), /after the previous one ends/);
-  await assert.rejects(next('2020-03-01', 'sprint'), /invalid mode/);
-  await next('2020-03-01');
+  await assert.rejects(next(todayPlus(-1)), /after the previous one ends/);
+  await assert.rejects(next(todayPlus(0), 'sprint'), /invalid mode/);
+  await next(todayPlus(0));
   const rows = (await q(`select start_date::text as s, completed_on::text as c, goal_weight::float as g, post_goal_mode as m from public.journeys where user_id=$1 order by start_date`, [DAVE])).rows;
-  assert.deepEqual(rows, [{ s: '2020-01-01', c: '2020-02-29', g: 65, m: null }, { s: '2020-03-01', c: null, g: 62, m: null }]);
+  assert.deepEqual(rows, [{ s: todayPlus(-60), c: todayPlus(-1), g: 65, m: null }, { s: todayPlus(0), c: null, g: 62, m: null }]);
   // the finished journey cannot be edited, and a second active journey cannot exist
-  const upd = await q(`update public.journeys set goal_weight = 90 where user_id=$1 and completed_on is not null`, [DAVE]);
-  assert.equal(upd.affectedRows, 0);
-  await assert.rejects(q(`insert into public.journeys (user_id, start_date, duration_days, start_weight, goal_weight) values ($1,'2021-01-01',30,60,60)`, [DAVE]), /unique|duplicate/i);
+  await noEffect(q(`update public.journeys set goal_weight = 90 where user_id=$1 and completed_on is not null`, [DAVE]));
+  await denied(q(`insert into public.journeys (user_id, start_date, duration_days, start_weight, goal_weight) values ($1,'2021-01-01',30,60,60)`, [DAVE]));
+  await assert.rejects( // and the unique index holds on its own, even for the table owner
+    db.query(`insert into public.journeys (user_id, start_date, duration_days, start_weight, goal_weight) values ($1,'2021-01-01',30,60,60)`, [DAVE]), /unique|duplicate/i);
   // onboarding's create_journey only ever touches the ACTIVE journey
-  await q(`select public.create_journey('2020-03-02'::date, 30, 65, 66, 2500)`);
+  await q(`select public.create_journey(current_date, 30, 65, 66, 2500)`);
   const after = (await q(`select start_date::text as s, duration_days as d from public.journeys where user_id=$1 order by start_date`, [DAVE])).rows;
-  assert.deepEqual(after, [{ s: '2020-01-01', d: 60 }, { s: '2020-03-02', d: 30 }]);
+  assert.deepEqual(after, [{ s: todayPlus(-60), d: 60 }, { s: todayPlus(0), d: 30 }]);
 });
 
 test('journey complete: cannot start the next journey before the last day, and other users cannot touch it', async () => {
@@ -246,16 +257,10 @@ test('journey complete: cannot start the next journey before the last day, and o
   await db.exec(`insert into auth.users values ('${CAT}', 'cat@example.com', '{"full_name":"Cat"}')`);
   await as(CAT, () => db.query(`select public.create_journey(current_date, 60, 48, 65, 2500)`));
   await assert.rejects(as(CAT, () => db.query(`select public.start_next_journey(current_date + 60, 30, 48, 50, 2500, 'journal')`)), /not complete yet/);
-  await as(CAT, () => db.query(`insert into public.user_achievements values ($1, 'journey', current_date)`, [CAT]));
+  // 'Journey Complete' is derived from the journey's dates: not yet earned, so claiming grants nothing (and cannot be forged)
+  assert.deepEqual((await as(CAT, () => db.query(`select public.claim_journey_complete() as r`))).rows[0].r, { ok: true, unlocked: [] });
+  await denied(as(CAT, () => db.query(`insert into public.user_achievements values ($1, 'journey', current_date)`, [CAT])));
   const EVE = '66666666-6666-6666-6666-666666666666'; // no journey at all
   await db.exec(`insert into auth.users values ('${EVE}', 'eve@example.com', '{"full_name":"Eve"}')`);
   await assert.rejects(as(EVE, () => db.query(`select public.start_next_journey(current_date + 60, 30, 48, 50, 2500, 'journal')`)), /no active journey/);
-});
-
-test('migration 2026-09-29_journey_complete.sql is re-runnable on the pre-migration shape', async () => {
-  const mig = readFileSync(new URL('../../supabase/migrations/2026-09-29_journey_complete.sql', import.meta.url), 'utf8');
-  await db.exec(mig);
-  await db.exec(mig);
-  const CAT = '55555555-5555-5555-5555-555555555555';
-  assert.equal((await as(CAT, () => db.query(`select count(*)::int as n from public.journeys`))).rows[0].n, 1);
 });

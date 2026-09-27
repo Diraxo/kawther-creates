@@ -24,10 +24,12 @@ import { classifyError } from './data/errors.js';
 import { initRepository, getRepo } from './data/repository.js';
 import { initTheme, setTheme } from './ui/theme.js';
 import { go, onTab, showNav, tab } from './ui/router.js';
+import { withBusy } from './ui/busy.js';
+import { initNetwork, syncNow } from './ui/network.js';
 import { closeOverlay } from './ui/overlays.js';
 import { confirmLogout, doLogin, doLogout, doSignup } from './screens/auth.js';
 import { finishOnboarding, obStep2, obStep3, obStep4, onDurInput, pickDur, stepDur } from './screens/onboarding.js';
-import { enterHome, openRenew } from './screens/home.js';
+import { enterHome, openRenew, renderHome } from './screens/home.js';
 import { chooseGoalMode, goalNext, showGoalExperience, goalSkip, onNewGoalSubmit, replayGoal } from './ui/goalExperience.js';
 import { journeyCompleteBack, journeyCompleteNext, onJourneyFormSubmit, pickChapter, showJourneyComplete } from './ui/journeyComplete.js';
 import {
@@ -37,27 +39,36 @@ import {
 import { applyCustomRange, renderProgress, setRange } from './screens/progress.js';
 import { renderJourney, showDay } from './screens/journey.js';
 import { openAchDetail, renderAch } from './screens/achievements.js';
-import { openProfile } from './screens/profile.js';
+import { openProfile, renderProfile } from './screens/profile.js';
 import { doShare, openShare, saveShareImage } from './screens/share.js';
 import { openPassword, savePassword } from './screens/password.js';
+import { mfaCancel, mfaConfirm, mfaRemoveCancel, mfaRemoveConfirm, mfaRemoveStart, mfaStart, openMfa } from './screens/mfa.js';
 
 // data-action name -> handler. Markup stays declarative; no inline onclick.
 const actions = {
   go: (el) => go(el.dataset.target),
   reload: () => location.reload(),
+  'retry-boot': (el) => withBusy(el, 'Reconnecting…', loadApp),
   tab: (el) => tab(el.dataset.s),
   signup: doSignup,
   login: doLogin,
   logout: doLogout,
   'confirm-logout': confirmLogout,
   'open-password': openPassword,
+  'open-mfa': openMfa,
+  'mfa-start': mfaStart,
+  'mfa-confirm': mfaConfirm,
+  'mfa-cancel': mfaCancel,
+  'mfa-remove': (el) => mfaRemoveStart(el.dataset.id),
+  'mfa-remove-confirm': mfaRemoveConfirm,
+  'mfa-remove-cancel': mfaRemoveCancel,
   'open-renew': openRenew,
   'celebrate-again': replayGoal,
-  'goal-choose': (el) => chooseGoalMode(el.dataset.mode),
+  'goal-choose': (el) => chooseGoalMode(el.dataset.mode, el),
   'change-goal-focus': () => showGoalExperience({ choicesOnly: true }),
   'reached-next': goalNext,
   'reached-skip': goalSkip,
-  'reached-choose': (el) => chooseGoalMode(el.dataset.mode),
+  'reached-choose': (el) => chooseGoalMode(el.dataset.mode, el),
   'journey-complete-open': () => showJourneyComplete(),
   'journey-complete-next': journeyCompleteNext,
   'journey-complete-back': journeyCompleteBack,
@@ -134,49 +145,106 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-/** Fade the branded splash out as soon as the first real screen is ready (no artificial delay). */
-function hideSplash() {
+/** Resolves after the next paint (with a fallback for hidden tabs, where rAF never fires). */
+const afterPaint = () => new Promise((resolve) => {
+  const t = setTimeout(resolve, 300);
+  requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); resolve(); }));
+});
+
+/** Fade the branded splash out once the first real screen has actually been painted (no artificial delay). */
+async function hideSplash() {
   const el = document.getElementById('splash');
   if (!el) return;
+  await afterPaint();
   el.classList.add('out');
   setTimeout(() => el.remove(), 500);
 }
 
-function showLoadError(message) {
+function showLoadError({ title, message, fatal = false }) {
+  state.status = 'error';
+  $('err-retry').dataset.action = fatal ? 'reload' : 'retry-boot'; // a misconfigured build can only be fixed by reloading
   showNav(false);
+  $('err-title').textContent = title;
   $('err-msg').textContent = message;
   go('s-error');
 }
 
-async function boot() {
-  initTheme();
-  try {
-    await initRepository();
-  } catch (e) {
-    console.error(e);
-    showLoadError("This app isn't configured correctly. Please contact support.");
-    hideSplash();
-    return;
-  }
+/** What went wrong, in words she can act on. Never a blank screen, never substitute data. */
+function describeLoadError(e) {
+  const offline = navigator.onLine === false || classifyError(e).code === 'NETWORK';
+  return offline
+    ? { title: "You're offline", message: 'Reconnect to continue syncing your journal.' }
+    : { title: "We couldn't load your journal", message: 'Something went wrong on our side. Please try again.' };
+}
+
+/**
+ * Restores the session, loads the user's data and routes to the right first screen. Used by boot AND by the error
+ * screen's Retry. Whatever happens, some real screen ends up active: the destination, or an explained error.
+ */
+async function loadApp() {
+  state.status = 'loading';
   try {
     const user = await getRepo().getSession();
     if (user) {
       state.user = user;
+      state.status = 'ready';
       if (user.onboarded) enterHome();
-      else go('s-ob1');
+      else { showNav(false); go('s-ob1'); }
     } else {
+      state.user = null;
+      state.status = 'signed-out';
       showNav(false);
       go('s-landing');
     }
   } catch (e) {
-    // Never substitute local/fake data: say what happened and let the user retry.
     console.error(e);
-    showLoadError(classifyError(e).code === 'NETWORK'
-      ? "Can't reach the server. Check your connection and try again."
-      : "We couldn't load your data. Please try again.");
+    showLoadError(describeLoadError(e));
   }
-  hideSplash();
 }
+
+async function boot() {
+  try {
+    initTheme();
+  } catch (e) {
+    console.error(e); // a broken theme must never keep the splash up forever
+  }
+  try {
+    await initRepository();
+  } catch (e) {
+    console.error(e);
+    showLoadError({ title: "We couldn't load your journal", message: "This app isn't configured correctly. Please contact support.", fatal: true });
+    await hideSplash();
+    return;
+  }
+  await loadApp();
+  await hideSplash();
+}
+
+/** Re-render whichever data screen is showing after fresh data was merged in (never while she is mid-edit). */
+function rerenderVisible(hasSession) {
+  if (!hasSession) {
+    state.user = null;
+    state.status = 'signed-out';
+    showNav(false);
+    document.querySelectorAll('.overlay.show').forEach((o) => o.classList.remove('show'));
+    go('s-login');
+    return;
+  }
+  if (!state.user || document.querySelector('.overlay.show')) return;
+  const active = document.querySelector('.screen.active');
+  const render = { 's-home': renderHome, 's-progress': renderProgress, 's-journey': renderJourney, 's-ach': renderAch, 's-profile': renderProfile }[active && active.id];
+  if (render) render();
+}
+
+initNetwork({ afterSync: rerenderVisible });
+// Coming back to the app after a while (or the next day): quietly re-read her data so Home never shows a stale "today".
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (hiddenAt && Date.now() - hiddenAt > 60000 && state.status === 'ready') syncNow({ silent: true });
+});
+// A page restored from the back/forward cache never re-runs boot(): start clean, splash first.
+window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 
 onTab('s-progress', renderProgress);
 onTab('s-journey', renderJourney);

@@ -48,7 +48,9 @@ function afterSwitch() {
   if (reducedMotion()) { renderProgress(); return; }
   chartEl.style.transition = 'opacity .18s ease';
   chartEl.style.opacity = '0';
-  setTimeout(() => { renderProgress(); chartEl.style.opacity = '1'; }, 170);
+  setTimeout(() => {
+    try { renderProgress(); } finally { chartEl.style.opacity = '1'; } // the chart can never be left invisible
+  }, 170);
 }
 
 export function setRange(el) {

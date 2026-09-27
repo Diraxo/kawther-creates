@@ -1,4 +1,4 @@
-.card{background:var(--card); border:1px solid var(--line); border-radius:20px; padding:20px; margin-bottom:16px; opacity:0; animation:cardIn .5s cubic-bezier(.16,.84,.44,1) forwards;}
+.card{background:var(--card); border:1px solid var(--line); border-radius:20px; padding:20px; margin-bottom:16px; animation:cardIn .5s cubic-bezier(.16,.84,.44,1) backwards;}
 .hero-card{background:linear-gradient(160deg,var(--emerald-tint),var(--card) 70%); border-radius:26px; padding:26px 22px; margin-bottom:16px; position:relative; overflow:hidden;}
 .hero-top{display:flex; justify-content:space-between; align-items:flex-start;}
 .hero-top .greet{font-size:14px; color:var(--sub);}
@@ -20,12 +20,13 @@
 .track{height:8px; border-radius:6px; background:var(--line); overflow:hidden;}
 .track i{display:block; height:100%; background:var(--emerald); border-radius:6px; transition:width .8s cubic-bezier(.2,.8,.2,1);}
 
-.ci-card{cursor:pointer; transition:border-color .2s, transform .15s;}
-.ci-card:active{transform:scale(.98);}
+.ci-card{transition:border-color .2s;}
 .ci-eyebrow{font-size:11px; letter-spacing:.08em; color:var(--sub); font-weight:700;}
 .ci-card h3{margin:8px 0 6px; font-size:16px; font-weight:700; line-height:1.35;}
 .ci-chips{font-size:12.5px; color:var(--emerald); margin-bottom:8px; font-weight:600;}
-.ci-cta{display:flex; align-items:center; gap:6px; color:var(--emerald); font-weight:700; font-size:13.5px;}
+.ci-cta{display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:0 18px; border-radius:14px; border:1.5px solid var(--emerald); background:var(--emerald-tint); color:var(--emerald); font-family:inherit; font-weight:700; font-size:13.5px; line-height:1; cursor:pointer; transition:background .2s, color .2s;}
+.ci-cta:hover{background:var(--emerald); color:#04150F;}
+.ci-cta:active{transform:scale(.97);}
 .ci-cta svg{width:15px; height:15px;}
 .ci-card.done{border-color:var(--emerald);}
 .brandtag{font-size:10.5px; letter-spacing:.14em; color:var(--sub); font-weight:700; margin-bottom:10px;}
@@ -40,4 +41,5 @@
 .mood.sel svg{filter:drop-shadow(0 0 6px var(--emerald-glow));}
 
 .card:nth-of-type(1){animation-delay:.02s;} .card:nth-of-type(2){animation-delay:.07s;} .card:nth-of-type(3){animation-delay:.12s;} .card:nth-of-type(4){animation-delay:.17s;} .card:nth-of-type(5){animation-delay:.22s;} .card:nth-of-type(6){animation-delay:.27s;}
-@keyframes cardIn{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);}}
+/* Entrance is decoration only: the resting state is fully visible, so a stalled or skipped animation (iOS standalone) can never leave a black card. */
+@keyframes cardIn{from{opacity:.6; transform:translateY(14px);}}

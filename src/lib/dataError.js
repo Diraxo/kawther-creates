@@ -4,11 +4,14 @@ import { state } from '../state.js';
 import { classifyError } from '../data/errors.js';
 import { go, showNav } from '../ui/router.js';
 import { toast } from './toast.js';
+import { noteNetworkFailure } from '../ui/network.js';
 
 export const MSG = {
   NETWORK: "Can't reach the server. Nothing was saved — check your connection and try again.",
   SESSION_EXPIRED: 'Your session expired. Please log in again.',
   FORBIDDEN: "You don't have permission to do that.",
+  RATE_LIMITED: "You're going a little fast. Please wait a moment and try again.",
+  CAPTCHA: "The security check didn't complete. Please try again.",
 };
 
 /**
@@ -27,6 +30,7 @@ export function reportDataError(e, fallback) {
     go('s-login');
     toast(MSG.SESSION_EXPIRED, 5000);
   } else {
+    if (err.code === 'NETWORK') noteNetworkFailure();
     toast(MSG[err.code] || fallback, err.code === 'NETWORK' ? 5000 : 2600);
   }
   return err.code;

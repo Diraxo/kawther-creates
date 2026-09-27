@@ -18,3 +18,10 @@
 .pw-toggle .i-eye-off{display:none;}
 .pw-toggle[aria-pressed="true"] .i-eye{display:none;}
 .pw-toggle[aria-pressed="true"] .i-eye-off{display:block;}
+
+/* Loading button (ui/busy.js): compact spinner + label, same box as the idle button. */
+.btn.busy, button.busy{cursor:progress; opacity:.85;}
+.btn:disabled{cursor:progress;}
+.spin{display:inline-block; width:15px; height:15px; margin-right:9px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; vertical-align:-2px; animation:kcSpin .7s linear infinite;}
+@keyframes kcSpin{to{transform:rotate(360deg);}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none; border-right-color:currentColor; opacity:.6;}}

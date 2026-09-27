@@ -7,7 +7,6 @@ import { reportDataError } from '../lib/dataError.js';
 import { celebrateAchievements } from '../ui/milestones.js';
 import { showGoalExperience } from '../ui/goalExperience.js';
 import { maybeCelebrateJourneyComplete } from '../ui/journeyComplete.js';
-import { goalAchievement } from '../domain/goal.js';
 import { state } from '../state.js';
 import { getRepo } from '../data/repository.js';
 import { todayStr } from '../domain/dates.js';
@@ -17,9 +16,11 @@ import {
 } from '../domain/checkin.js';
 import { currentDayIndex, lastLoggedWeight, waterGoalOf, waterMessage } from '../domain/journey.js';
 import { calcStreak } from '../domain/streak.js';
-import { findNewUnlocks } from '../domain/achievements.js';
+import { ACH_DEFS } from '../domain/achievements.js';
 import { go } from '../ui/router.js';
 import { closeOverlay, openOverlay } from '../ui/overlays.js';
+import { isBusy, withBusy } from '../ui/busy.js';
+import { isOffline } from '../ui/network.js';
 import { renderHome } from './home.js';
 
 // ---------- open / mood ----------
@@ -39,9 +40,14 @@ export function openCheckin() {
   $('ci-status').hidden = !existing;
   $('ci-save-btn').textContent = existing ? 'Update check-in' : 'Save check-in';
   $$('#ci-mood .mood').forEach((m) => m.classList.toggle('sel', m.dataset.m === draft.mood));
-  $('ci-weight').value = draft.weight || '';
+  // Editing today's saved check-in shows TODAY's saved weight. A brand-new check-in starts from the last weight she
+  // actually logged (real repository data), so she only nudges it. Nothing is written until she taps Save.
   const logged = lastLoggedWeight(user);
-  $('ci-weight-prev').textContent = logged ? `Last logged: ${logged.toFixed(1)} kg` : `Starting weight: ${user.journey.startWeight.toFixed(1)} kg`;
+  const carried = !existing && logged ? logged : null;
+  $('ci-weight').value = existing ? (draft.weight || '') : (carried || '');
+  $('ci-weight-prev').textContent = carried
+    ? `From your last logged weight (${carried.toFixed(1)} kg). Adjust it if today is different.`
+    : logged ? `Last logged: ${logged.toFixed(1)} kg` : `Starting weight: ${user.journey.startWeight.toFixed(1)} kg`;
   $('ci-notes').value = draft.notes || '';
   $('e-ci-water').textContent = '';
   updateWaterUI(true);
@@ -91,11 +97,22 @@ export function onWaterInput() {
   updateWaterUI(false);
 }
 
+/** 0.25 -> "0.25", 1.5 -> "1.5", 0 -> "0". */
+const litresText = (ml) => String(Number((ml / 1000).toFixed(2)));
+
+/** The number hugs its own digits, so "0.25 L / 5 L" reads as one compact metric (no fixed-width gap after the value). */
+function fitWaterInput() {
+  const input = $('ci-water-input');
+  const shown = input.value || input.placeholder || '0';
+  input.style.width = `${Math.max(1, shown.length) + 0.4}ch`;
+}
+
 /** `writeInput`: also rewrite the field (buttons/open); false while the user is typing in it. */
 function updateWaterUI(writeInput) {
   const goal = waterGoalOf(state.user.journey);
   const water = state.draft.water || 0;
-  if (writeInput) $('ci-water-input').value = water ? String(Number((water / 1000).toFixed(2))) : '';
+  if (writeInput) $('ci-water-input').value = water ? litresText(water) : '';
+  fitWaterInput();
   $('ci-water-goal-num').textContent = String(Number((goal / 1000).toFixed(2)));
   $('ci-water-goal-label').textContent = formatLitres(goal);
   const { ratio, text, goalHit } = waterMessage(water, goal);
@@ -109,12 +126,14 @@ export function openGoalEdit() {
   openOverlay('ov-goal');
 }
 
-export async function saveGoal() {
+export async function saveGoal(btn) {
+  if (isBusy(btn)) return;
   const v = parseFloat($('goal-input').value);
   if (!v || v < 0.5 || v > 6) return;
+  if (isOffline()) { toast("You're offline. Reconnect to save this.", 4000); return; }
   const ml = Math.round(v * 1000);
   try {
-    await getRepo().updateWaterGoal(ml);
+    await withBusy(btn, 'Saving…', () => getRepo().updateWaterGoal(ml));
   } catch (e) {
     reportDataError(e, "Couldn't save your goal. Please try again.");
     return;
@@ -219,10 +238,11 @@ export function setExUnit(unit) {
 }
 
 // ---------- save ----------
-export async function saveCheckin() {
+export async function saveCheckin(btn) {
   const { user } = state;
-  const btn = $('ci-save-btn');
+  btn = btn || $('ci-save-btn');
   const draft = state.draft;
+  if (isBusy(btn)) return;
 
   // Validate first (nothing is sent, nothing is disabled, if the form isn't valid).
   if ($('ci-ex-yes').classList.contains('on')) {
@@ -241,33 +261,31 @@ export async function saveCheckin() {
     $('ci-water-input').focus();
     return;
   }
-  const origText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  btn.style.opacity = '.75';
+  if (isOffline()) {
+    toast("You're offline. Reconnect to save this.", 4000); // never pretend it was saved; the draft stays on screen
+    return;
+  }
 
   const typedWeight = parseFloat($('ci-weight').value);
-  // Only a weight the user actually entered is saved — never a carried-over or invented value.
+  // The weight field is what she sees (typed, or carried over from her last logged weight): that is what is saved.
   draft.weight = (typedWeight ? Math.round(typedWeight * 10) / 10 : null) || draft.weight || null;
   draft.notes = $('ci-notes').value.trim();
   const d = todayStr();
   const wasExisting = !!user.checkins[d];
   const prevWater = user.checkins[d] ? user.checkins[d].water || 0 : 0;
 
+  let saved;
   try {
-    await getRepo().saveCheckin(d, draft);
+    saved = await withBusy(btn, wasExisting ? 'Updating…' : 'Saving…', () => getRepo().saveCheckin(d, draft));
   } catch (e) {
-    btn.disabled = false;
-    btn.textContent = origText;
-    btn.style.opacity = '';
     reportDataError(e, "Couldn't save your check-in. Please try again."); // draft stays; nothing is shown as saved
     return;
   }
+  if (!saved) return; // a second tap while the first save was in flight
+  // Confirmed persisted: update the working copy and Home NOW, so nothing depends on a later navigation.
   user.checkins[d] = cloneCheckin(draft);
-
-  btn.disabled = false;
-  btn.textContent = origText;
-  btn.style.opacity = '';
+  const unlocked = applyUnlocked(saved.unlocked);
+  renderHome();
   const streak = calcStreak(user.checkins, d);
   const goal = waterGoalOf(user.journey);
   $('cel-eyebrow').textContent = wasExisting ? 'Check-in updated' : 'Check-in complete';
@@ -278,27 +296,29 @@ export async function saveCheckin() {
     .join('');
   openOverlay('ov-celebrate');
   if ((draft.water || 0) >= goal && prevWater < goal) setTimeout(() => toast('Hydration goal complete'), 700);
-  await checkAchievements(d);
-  renderHome();
+  celebrateUnlocked(unlocked);
   maybeCelebrateJourneyComplete();
 }
 
-async function checkAchievements(today) {
+/**
+ * Celebrates what the DATABASE granted with this save. The browser never decides or persists an achievement: the server
+ * derives them from the saved rows (supabase/schema.sql), so anything it did not grant is not celebrated.
+ * The goal is dated to the day the weight was actually reached (not necessarily today), as reported by the server.
+ */
+function applyUnlocked(granted) {
   const { user } = state;
   const unlocked = [];
-  for (const a of findNewUnlocks(user, today)) {
-    // The goal is recorded on the day the weight was actually reached (not necessarily today).
-    const on = a.id === 'goal' ? goalAchievement(user).date : today;
-    try {
-      await getRepo().unlockAchievement(a.id, on);
-    } catch (e) {
-      console.error(e);
-      continue; // not persisted -> not celebrated; re-evaluated on the next save
-    }
+  for (const g of granted) {
+    const a = ACH_DEFS.find((x) => x.id === g.id);
+    if (!a || user.unlocked.includes(a.id)) continue;
     user.unlocked.push(a.id);
-    user.unlockedDates[a.id] = on;
+    user.unlockedDates[a.id] = g.date;
     unlocked.push(a);
   }
+  return unlocked;
+}
+
+function celebrateUnlocked(unlocked) {
   const goalUnlocked = unlocked.find((a) => a.id === 'goal');
   const ordinary = unlocked.filter((a) => a.id !== 'goal');
   if (!goalUnlocked) { celebrateAchievements(ordinary); return; } // queued: shown one after another, in unlock order

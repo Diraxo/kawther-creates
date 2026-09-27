@@ -11,3 +11,19 @@
 
 .kc-toast{position:fixed; left:50%; bottom:110px; transform:translateX(-50%) translateY(10px); background:var(--card2); color:var(--ink); border:1px solid var(--emerald); padding:10px 18px; border-radius:999px; font-size:13px; font-weight:600; opacity:0; transition:all .3s ease; z-index:200; box-shadow:0 8px 24px -8px var(--emerald-glow); white-space:normal; text-align:center; width:max-content; max-width:88vw;}
 .kc-toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+/* Connection banner (ui/network.js): quiet, honest, never a browser alert. */
+.netbar{position:fixed; left:50%; top:calc(env(safe-area-inset-top, 0px) + 8px); transform:translateX(-50%); z-index:900; width:min(calc(100% - 24px), 456px); display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:14px; background:var(--card2); border:1px solid var(--line); box-shadow:0 8px 28px -10px rgba(0,0,0,.5); font-size:13px;}
+.netbar[hidden]{display:none;}
+.netbar .nettext{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px;}
+.netbar b{font-weight:700;}
+.netbar .nettext span{color:var(--sub); font-size:12px;}
+.netbar .nettext span:empty{display:none;}
+.netdot{width:8px; height:8px; border-radius:50%; background:var(--gold); flex:none;}
+.netbar[data-state="syncing"] .netdot{background:var(--emerald); animation:netPulse 1s ease-in-out infinite;}
+.netbar[data-state="synced"] .netdot{background:var(--emerald);}
+.netbar[data-state="failed"] .netdot, .netbar[data-state="offline"] .netdot{background:var(--danger);}
+.netbar[data-state="offline"] .netdot{background:var(--gold);}
+.netbar button{min-height:36px; padding:0 14px; border-radius:10px; border:1px solid var(--emerald); background:var(--emerald-tint); color:var(--emerald); font-weight:700; font-size:12.5px; cursor:pointer;}
+@keyframes netPulse{50%{opacity:.35;}}
+@media(prefers-reduced-motion:reduce){.netbar[data-state="syncing"] .netdot{animation:none;}}

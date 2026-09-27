@@ -10,3 +10,6 @@ Thumbs.db
 .claude/
 test-results/
 screenshots/
+
+# Supabase CLI local state (project refs, temp files)
+supabase/.temp/

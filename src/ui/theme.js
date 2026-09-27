@@ -3,7 +3,9 @@ import { $$ } from '../lib/dom.js';
 const KEY = 'kc_theme';
 const mq = window.matchMedia('(prefers-color-scheme: dark)');
 
-export const getTheme = () => localStorage.getItem(KEY) || 'dark';
+export const getTheme = () => {
+  try { return localStorage.getItem(KEY) || 'dark'; } catch { return 'dark'; } // storage can throw (private mode): never block startup
+};
 
 function apply(t) {
   const resolved = t === 'system' ? (mq.matches ? 'dark' : 'light') : t;
@@ -11,7 +13,7 @@ function apply(t) {
 }
 
 export function setTheme(t) {
-  localStorage.setItem(KEY, t);
+  try { localStorage.setItem(KEY, t); } catch { /* the theme still applies for this session */ }
   $$('.theme-opt[data-t]').forEach((o) => o.classList.toggle('on', o.dataset.t === t));
   apply(t);
 }

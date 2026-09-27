@@ -18,8 +18,8 @@ button{font-family:inherit;}
 svg.ic{width:20px; height:20px; stroke:currentColor; stroke-width:1.8; fill:none; stroke-linecap:round; stroke-linejoin:round; display:block;}
 .app{max-width:480px; margin:0 auto; min-height:100vh; position:relative; padding-bottom:92px;}
 @media(min-width:900px){.app{max-width:520px; border-left:1px solid var(--line); border-right:1px solid var(--line);}}
-.screen{display:none; padding:24px 20px 12px; animation:fadeUp .45s ease both;}
+.screen{display:none; padding:24px 20px 12px; animation:fadeUp .45s ease backwards;}
 .screen.active{display:block;}
-@keyframes fadeUp{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+@keyframes fadeUp{from{opacity:.6; transform:translateY(10px);}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms !important; transition-duration:.01ms !important;}}
 

@@ -44,7 +44,7 @@ async function mock(page, o = {}) {
     if (p.endsWith('/auth/v1/user')) return json(route, 200, USER);
     if (p.includes('/rest/v1/rpc/')) { const name = p.split('/').pop(); return (o.rpc && o.rpc[name]) ? o.rpc[name](route) : json(route, 200, null); }
     if (p.endsWith('/rest/v1/profiles')) return json(route, 200, { id: USER.id, full_name: 'Mock User', email: USER.email, onboarded: true });
-    if (p.endsWith('/rest/v1/journeys')) return json(route, 200, { user_id: USER.id, start_date: TODAY, duration_days: 90, start_weight: 72, goal_weight: 62, water_goal_ml: 2500 });
+    if (p.endsWith('/rest/v1/journeys')) return json(route, 200, [{ user_id: USER.id, start_date: TODAY, duration_days: 90, start_weight: 72, goal_weight: 62, water_goal_ml: 2500, completed_on: null }]); // a list since multi-journey history
     if (p.endsWith('/rest/v1/checkins') || p.endsWith('/rest/v1/checkin_meals') || p.endsWith('/rest/v1/user_achievements')) return json(route, 200, []);
     return json(route, 404, { message: 'unmocked ' + p });
   });
@@ -149,6 +149,9 @@ const cases = [
   ['RLS/permission rejection 403', (r) => json(r, 403, { code: '42501', message: 'new row violates row-level security policy for table "checkins"' }), /permission/i, 's-checkin'],
   ['meal constraint violation 400 (rolled back server-side)', (r) => json(r, 400, { code: '23514', message: 'new row for relation "checkin_meals" violates check constraint' }), /Couldn't save your check-in/, 's-checkin'],
   ['network drops mid-save', (r) => r.abort('connectionreset'), /Can't reach the server\. Nothing was saved/, 's-checkin'],
+  // server-side abuse protection: a clean application result (not a database exception) and nothing pretends to be saved
+  ['per-user rate limit hit (clean {ok:false, code:rate_limited})', (r) => json(r, 200, { ok: false, code: 'rate_limited', retry_after: 42 }), /going a little fast/i, 's-checkin'],
+  ['server-side validation error (invalid check-in payload)', (r) => json(r, 400, { code: '22023', message: 'invalid check-in payload: notes are too long (max 4000 characters)' }), /Couldn't save your check-in/, 's-checkin'],
 ];
 for (const [name, handler, msg, stays] of cases) {
   const { ctx, page, uncaught } = await open('http://localhost:5174', { rpc: { save_checkin: handler } });
