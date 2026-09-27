@@ -84,7 +84,7 @@ html{background:#060706;}
   <div class="field"><label for="su-email">Email</label><input id="su-email" type="email" placeholder="you@email.com" autocomplete="email"><div class="err" id="e-su-email">Please enter a valid email.</div></div>
   <div class="field"><label for="su-pass">Password</label><div class="pw-wrap"><input id="su-pass" type="password" placeholder="At least 8 characters" autocomplete="new-password"><button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Show password" aria-pressed="false"><svg class="i-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="i-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button></div><div class="err" id="e-su-pass">Password must contain at least 8 characters.</div></div>
   <div class="field"><label for="su-pass2">Confirm password</label><div class="pw-wrap"><input id="su-pass2" type="password" placeholder="Re-enter password" autocomplete="new-password"><button type="button" class="pw-toggle" data-action="toggle-pw" aria-label="Show password" aria-pressed="false"><svg class="i-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="i-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg></button></div><div class="err" id="e-su-pass2">Passwords don't match.</div></div>
-  <button class="btn" data-action="signup">Create account</button>
+  <button class="btn" id="btn-signup" data-action="signup" disabled>Create account</button>
   <div class="linkrow">Already have an account? <a role="button" tabindex="0" data-action="go" data-target="s-login">Log in</a></div>
 </section>
 
@@ -97,7 +97,7 @@ html{background:#060706;}
   <div class="field" id="li-mfa-field" hidden><label for="li-mfa">Authentication code</label><input id="li-mfa" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6-digit code"></div>
   <div class="err" id="e-login">Email or password is incorrect.</div>
   <div style="height:6px"></div>
-  <button class="btn" data-action="login">Log in</button>
+  <button class="btn" id="btn-login" data-action="login" disabled>Log in</button>
   <div class="linkrow">New here? <a role="button" tabindex="0" data-action="go" data-target="s-signup">Create account</a></div>
 </section>
 

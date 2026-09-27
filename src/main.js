@@ -28,7 +28,7 @@ import { go, onTab, showNav, tab } from './ui/router.js';
 import { withBusy } from './ui/busy.js';
 import { initNetwork, syncNow } from './ui/network.js';
 import { closeOverlay } from './ui/overlays.js';
-import { confirmLogout, doLogin, doLogout, doSignup } from './screens/auth.js';
+import { confirmLogout, doLogin, doLogout, doSignup, updateLoginButton, updateSignupButton } from './screens/auth.js';
 import { finishOnboarding, obStep2, obStep3, obStep4, onDurInput, pickDur, stepDur } from './screens/onboarding.js';
 import { enterHome, openRenew, renderHome } from './screens/home.js';
 import { chooseGoalMode, goalNext, showGoalExperience, goalSkip, onNewGoalSubmit, replayGoal } from './ui/goalExperience.js';
@@ -48,7 +48,11 @@ import { mfaCancel, mfaConfirm, mfaRemoveCancel, mfaRemoveConfirm, mfaRemoveStar
 
 // data-action name -> handler. Markup stays declarative; no inline onclick.
 const actions = {
-  go: (el) => go(el.dataset.target),
+  go: (el) => {
+    go(el.dataset.target);
+    if (el.dataset.target === 's-login') updateLoginButton();
+    else if (el.dataset.target === 's-signup') updateSignupButton();
+  },
   reload: () => location.reload(),
   'retry-boot': (el) => withBusy(el, 'Reconnecting…', loadApp),
   tab: (el) => tab(el.dataset.s),
@@ -234,6 +238,7 @@ function rerenderVisible(hasSession) {
     showNav(false);
     document.querySelectorAll('.overlay.show').forEach((o) => o.classList.remove('show'));
     go('s-login');
+    updateLoginButton();
     return;
   }
   if (!state.user || document.querySelector('.overlay.show')) return;

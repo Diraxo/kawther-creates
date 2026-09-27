@@ -15,6 +15,22 @@ const LOGIN_ERR_DEFAULT = 'Email or password is incorrect.';
 const MFA_PROMPT = 'Enter the 6-digit code from your authenticator app.';
 let mfaPending = false; // the password was accepted; the account needs its second factor before anything loads
 
+const filled = (id) => $(id).value.trim().length > 0;
+
+/** Log in stays unclickable until email + password (and, once asked for, the MFA code) are all filled in. */
+export function updateLoginButton() {
+  const btn = $('btn-login');
+  if (!btn) return;
+  btn.disabled = !(filled('li-email') && filled('li-pass') && (!mfaPending || filled('li-mfa')));
+}
+
+/** Create account stays unclickable until every signup field has something in it. */
+export function updateSignupButton() {
+  const btn = $('btn-signup');
+  if (!btn) return;
+  btn.disabled = !['su-name', 'su-email', 'su-pass', 'su-pass2'].every(filled);
+}
+
 function resetMfaPrompt() {
   if (!mfaPending) return;
   mfaPending = false;
@@ -24,6 +40,8 @@ function resetMfaPrompt() {
 }
 document.addEventListener('input', (e) => {
   if (e.target.id === 'li-email' || e.target.id === 'li-pass') resetMfaPrompt();
+  if (['li-email', 'li-pass', 'li-mfa'].includes(e.target.id)) updateLoginButton();
+  if (['su-name', 'su-email', 'su-pass', 'su-pass2'].includes(e.target.id)) updateSignupButton();
 });
 
 function routeAfterLogin() {
@@ -80,6 +98,7 @@ export async function doLogin(btn) {
       $('li-mfa').focus();
       err.textContent = MFA_PROMPT;
       err.style.display = 'block';
+      updateLoginButton();
       return;
     }
     if (!(e instanceof AuthError && (e.code === 'INVALID_CREDENTIALS' || e.code === 'MFA_INVALID'))) console.error(e);
@@ -94,6 +113,7 @@ export async function doLogin(btn) {
     err.style.display = 'block';
   }
   });
+  updateLoginButton(); // withBusy always re-enables the button; re-apply the field-based state (e.g. MFA now required)
 }
 
 /** Step 1: ask. Nothing is signed out until the user confirms in the dialog. */
