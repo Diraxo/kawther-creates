@@ -11,7 +11,8 @@ import { state } from '../state.js';
 import { getRepo } from '../data/repository.js';
 import { todayStr } from '../domain/dates.js';
 import {
-  MEAL_CATEGORIES, checkinGaps, cloneCheckin, emptyCheckin, formatLitres, nowTimeLabel, nowTimeValue, to12, to24,
+  MAX_MEALS_PER_DAY, MEAL_CATEGORIES, MEAL_LABELS, checkinGaps, cloneCheckin, emptyCheckin, formatLitres, mealCount, mealsWithAdded,
+  mealsWithRemoved, mealsWithReplaced, nowTimeLabel, nowTimeValue, to12, to24,
 } from '../domain/checkin.js';
 import { MUSCLE_SUGGESTIONS, buildExercise, cleanMuscles, normalizeExercise, splitMinutes } from '../domain/movement.js';
 import { currentDayIndex, lastLoggedWeight, waterGoalOf, waterMessage } from '../domain/journey.js';
@@ -22,6 +23,7 @@ import { closeOverlay, openOverlay } from '../ui/overlays.js';
 import { isBusy, withBusy } from '../ui/busy.js';
 import { isOffline } from '../ui/network.js';
 import { renderHome } from './home.js';
+import { mealBodyHtml, mealEmptyHtml } from '../lib/mealView.js';
 
 // ---------- open / mood ----------
 /**
@@ -128,11 +130,50 @@ export async function saveGoal(btn) {
 }
 
 // ---------- meals ----------
+// A meal is saved the moment it is confirmed: it is written to today's check-in through the repository (the same
+// save_checkin RPC, with only the meals changed), so it survives leaving the form and a reload, and the Journey reads
+// the very same record. Every change is computed on a COPY (domain/checkin.js) and becomes the working state only after
+// the backend confirmed it, so a failed save never leaves a meal on screen that was not stored.
+let mealSaving = false; // one meal write at a time: a second would be computed from a stale list
+/** Achievements the server granted while saving a meal: celebrated with the next full check-in save, never lost. */
+const pendingUnlocks = new WeakMap();
+
+async function persistMeals(next, btn) {
+  const { user } = state;
+  if (mealSaving) return false;
+  if (isOffline()) { toast("You're offline. Reconnect to save this.", 4000); return false; }
+  const d = todayStr();
+  const base = user.checkins[d] ? cloneCheckin(user.checkins[d]) : emptyCheckin(); // the day as saved; only its meals change
+  base.meals = next;
+  mealSaving = true;
+  let saved;
+  try {
+    saved = await withBusy(btn, 'Saving…', () => getRepo().saveCheckin(d, base));
+  } catch (e) {
+    reportDataError(e, "Couldn't save this meal. Please try again.");
+    return false;
+  } finally {
+    mealSaving = false;
+  }
+  if (!saved) return false;
+  user.checkins[d] = base;
+  state.draft.meals = cloneCheckin({ meals: next }).meals;
+  pendingUnlocks.set(user, [...(pendingUnlocks.get(user) || []), ...applyUnlocked(saved.unlocked)]);
+  // The day now exists in the backend: the form is editing a saved check-in, and Home already reflects it.
+  state.editingExisting = true;
+  $('ci-status').hidden = false;
+  $('ci-save-btn').textContent = 'Update check-in';
+  renderHome();
+  return true;
+}
+
 export function addMeal(cat) {
+  if (mealCount(state.draft) >= MAX_MEALS_PER_DAY) { toast(`You can log up to ${MAX_MEALS_PER_DAY} meals a day.`, 4000); return; }
   state.meal = { category: cat, index: null };
   $('meal-name').value = '';
   $('meal-notes').value = '';
   $('meal-time').value = nowTimeValue();
+  $('meal-modal-cat').textContent = MEAL_LABELS[cat]; // the destination is fixed by the section she tapped, and shown in the sheet
   $('meal-modal-title').textContent = 'What did you eat?';
   $('meal-delete-btn').style.display = 'none';
   openOverlay('ov-meal');
@@ -144,40 +185,42 @@ export function editMeal(cat, i) {
   $('meal-name').value = m.name;
   $('meal-notes').value = m.notes || '';
   $('meal-time').value = to24(m.time);
+  $('meal-modal-cat').textContent = MEAL_LABELS[cat]; // editing never moves a meal to another section
   $('meal-modal-title').textContent = 'Edit meal';
   $('meal-delete-btn').style.display = 'block';
   openOverlay('ov-meal');
 }
 
-export function confirmMeal() {
+export async function confirmMeal(btn) {
   const name = $('meal-name').value.trim();
-  if (!name) return;
+  if (!name) { $('meal-name').focus(); return; }
   const timeVal = $('meal-time').value;
   const obj = { name, notes: $('meal-notes').value.trim(), time: timeVal ? to12(timeVal) : nowTimeLabel() };
   const { category, index } = state.meal;
-  if (index != null) state.draft.meals[category][index] = obj;
-  else state.draft.meals[category].push(obj);
+  const meals = state.draft.meals;
+  const next = index != null ? mealsWithReplaced(meals, category, index, obj) : mealsWithAdded(meals, category, obj);
+  if (!(await persistMeals(next, btn))) return; // the sheet stays open with what she typed
   renderMeals(category);
   closeOverlay('ov-meal');
 }
 
-export function deleteMealFromModal() {
+export async function deleteMealFromModal(btn) {
   const { category, index } = state.meal;
-  if (index != null) {
-    state.draft.meals[category].splice(index, 1);
-    renderMeals(category);
-  }
+  if (index == null) { closeOverlay('ov-meal'); return; }
+  if (!(await persistMeals(mealsWithRemoved(state.draft.meals, category, index), btn))) return;
+  renderMeals(category);
   closeOverlay('ov-meal');
 }
 
 export function renderMeals(cat) {
   const el = $('ci-meal-' + cat);
   el.innerHTML = '';
-  if (!(state.draft.meals[cat] || []).length) el.innerHTML = '<div class="meal-empty">Nothing logged yet</div>';
-  (state.draft.meals[cat] || []).forEach((m, i) => {
+  const list = state.draft.meals[cat] || [];
+  if (!list.length) el.innerHTML = mealEmptyHtml(cat);
+  list.forEach((m, i) => {
     const row = document.createElement('div');
     row.className = 'meal-item';
-    row.innerHTML = `<div class="meal-info" data-action="edit-meal" data-cat="${cat}" data-i="${i}" role="button" tabindex="0"><span>${esc(m.name)}</span><span style="color:var(--sub)">${esc(m.time)}</span></div><button class="meal-del" aria-label="Delete ${esc(m.name)}" data-action="ask-delete-meal" data-cat="${cat}" data-i="${i}">${TRASH_SVG}</button>`;
+    row.innerHTML = `<div class="meal-info" data-action="edit-meal" data-cat="${cat}" data-i="${i}" role="button" tabindex="0" aria-label="Edit ${esc(m.name)}">${mealBodyHtml(m)}</div><button class="meal-del" aria-label="Delete ${esc(m.name)}" data-action="ask-delete-meal" data-cat="${cat}" data-i="${i}">${TRASH_SVG}</button>`;
     el.appendChild(row);
   });
 }
@@ -185,12 +228,12 @@ export function renderMeals(cat) {
 export function askDeleteMeal(btn, cat, i) {
   const row = btn.parentElement;
   row.classList.add('confirm');
-  row.innerHTML = `<span style="color:var(--danger); font-weight:600;">Delete this?</span><div style="display:flex; gap:8px;"><button class="mini-btn" data-action="do-delete-meal" data-cat="${cat}" data-i="${i}">Delete</button><button class="mini-btn ghost2" data-action="cancel-delete-meal" data-cat="${cat}">Cancel</button></div>`;
+  row.innerHTML = `<span class="meal-confirm-q">Delete this?</span><div class="meal-confirm-btns"><button class="mini-btn" data-action="do-delete-meal" data-cat="${cat}" data-i="${i}">Delete</button><button class="mini-btn ghost2" data-action="cancel-delete-meal" data-cat="${cat}">Cancel</button></div>`;
 }
 
-export function doDeleteMeal(cat, i) {
-  state.draft.meals[cat].splice(i, 1);
-  renderMeals(cat);
+export async function doDeleteMeal(cat, i, btn) {
+  await persistMeals(mealsWithRemoved(state.draft.meals, cat, i), btn);
+  renderMeals(cat); // removed on success; if the save failed the meal row is simply restored
 }
 
 // ---------- movement ----------
@@ -408,7 +451,9 @@ export async function saveCheckin(btn) {
   if (!saved) return; // a second tap while the first save was in flight
   // Confirmed persisted: update the working copy and Home NOW, so nothing depends on a later navigation.
   user.checkins[d] = cloneCheckin(draft);
-  const unlocked = applyUnlocked(saved.unlocked);
+  const queued = pendingUnlocks.get(user) || []; // granted while saving meals: celebrated now, with this save
+  pendingUnlocks.delete(user);
+  const unlocked = [...queued, ...applyUnlocked(saved.unlocked)];
   renderHome();
   const streak = calcStreak(user.checkins, d);
   const goal = waterGoalOf(user.journey);

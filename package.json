@@ -16,6 +16,7 @@
     "test:ux": "node tests/e2e/ux.mjs",
     "test:lifecycle": "node tests/e2e/lifecycle.mjs",
     "test:movement": "node tests/e2e/movement.mjs",
+    "test:meals": "node tests/e2e/meals.mjs",
     "test:goal": "node tests/e2e/goal.mjs",
     "test:duration": "node tests/e2e/duration.mjs",
     "test:responsive": "node tests/e2e/responsive.mjs",

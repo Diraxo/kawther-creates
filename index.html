@@ -476,10 +476,11 @@ html{background:#060706;}
 
 <div class="overlay" id="ov-meal"><div class="sheet" role="dialog" aria-modal="true" aria-label="Meal">
   <div class="sheet-close" role="button" tabindex="0" data-action="close-overlay" data-target="ov-meal">Cancel</div>
+  <div class="meal-dest" id="meal-modal-cat"></div>
   <h3 class="serif" id="meal-modal-title" style="margin-top:0;">What did you eat?</h3>
-  <div class="field"><label for="meal-name">Food name</label><input id="meal-name" placeholder="e.g. Eggs & toast"></div>
+  <div class="field"><label for="meal-name">Food name</label><input id="meal-name" maxlength="200" placeholder="e.g. Eggs & toast"></div>
   <div class="field"><label for="meal-time">Time</label><input id="meal-time" type="time"></div>
-  <div class="field"><label for="meal-notes">Notes (optional)</label><input id="meal-notes" placeholder=""></div>
+  <div class="field"><label for="meal-notes">Notes (optional)</label><input id="meal-notes" maxlength="1000" placeholder=""></div>
   <button class="btn" data-action="confirm-meal">Save</button>
   <button class="btn secondary" id="meal-delete-btn" style="margin-top:10px; display:none; color:var(--danger); border-color:var(--danger);" data-action="delete-meal-modal">Delete meal</button>
 </div></div>

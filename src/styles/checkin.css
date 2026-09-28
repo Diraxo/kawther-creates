@@ -7,5 +7,4 @@
 
 .meal-sec{margin-bottom:14px;}
 .meal-sec h4{font-size:13.5px; color:var(--sub); margin:0 0 8px; font-weight:600;}
-.meal-item{display:flex; justify-content:space-between; background:var(--emerald-tint); border-radius:12px; padding:10px 12px; margin-bottom:6px; font-size:13.5px;}
-.addmeal{font-size:13px; color:var(--emerald); font-weight:600; cursor:pointer; padding:8px 0;}
+.addmeal{font-size:13px; color:var(--emerald); font-weight:600; cursor:pointer; display:flex; align-items:center; min-height:40px;}

@@ -154,7 +154,11 @@ const cases = [
   ['server-side validation error (invalid check-in payload)', (r) => json(r, 400, { code: '22023', message: 'invalid check-in payload: notes are too long (max 4000 characters)' }), /Couldn't save your check-in/, 's-checkin'],
 ];
 for (const [name, handler, msg, stays] of cases) {
-  const { ctx, page, uncaught } = await open('http://localhost:5174', { rpc: { save_checkin: handler } });
+  // The first save_checkin is the meal being saved as it is added (meals are stored the moment they are confirmed); the failure under
+  // test is the check-in save that follows, so only the calls after the first one use the failing handler.
+  let calls = 0;
+  const rpc = { save_checkin: (r) => (calls++ === 0 ? json(r, 200, { ok: true, unlocked: [] }) : handler(r)) };
+  const { ctx, page, uncaught } = await open('http://localhost:5174', { rpc });
   await login(page);
   await toCheckin(page);
   await page.click('#ci-save-btn');

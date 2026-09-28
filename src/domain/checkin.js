@@ -58,6 +58,54 @@ export function mealCount(c) {
   return Object.values(c.meals || {}).reduce((n, list) => n + list.length, 0);
 }
 
+export const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
+/** The database refuses more than this many meals for one day (save_checkin), so the form says so first. */
+export const MAX_MEALS_PER_DAY = 30;
+
+function assertCategory(cat) {
+  if (!MEAL_CATEGORIES.includes(cat)) throw new Error(`Unknown meal section: ${cat}`);
+}
+
+/** A meals object is never mutated: each change returns a new one, so a failed save leaves the working copy untouched. */
+function copyMeals(meals) {
+  const out = {};
+  MEAL_CATEGORIES.forEach((cat) => { out[cat] = [...((meals || {})[cat] || [])]; });
+  return out;
+}
+
+/** `meal` joins the END of ITS OWN section (`cat` is explicit, never inferred from the name); every other meal is kept. */
+export function mealsWithAdded(meals, cat, meal) {
+  assertCategory(cat);
+  const out = copyMeals(meals);
+  out[cat].push(meal);
+  return out;
+}
+
+/** Replaces the meal at `index` inside `cat`: same section, same position, no duplicate. */
+export function mealsWithReplaced(meals, cat, index, meal) {
+  assertCategory(cat);
+  const out = copyMeals(meals);
+  if (!out[cat][index]) throw new Error('That meal no longer exists.');
+  out[cat][index] = meal;
+  return out;
+}
+
+/** Removes only the meal at `index` inside `cat`. */
+export function mealsWithRemoved(meals, cat, index) {
+  assertCategory(cat);
+  const out = copyMeals(meals);
+  if (!out[cat][index]) throw new Error('That meal no longer exists.');
+  out[cat].splice(index, 1);
+  return out;
+}
+
+/** The saved meals of a day grouped for display, in the canonical order, sections with no meals left out. */
+export function mealGroups(c) {
+  return MEAL_CATEGORIES
+    .map((cat) => ({ cat, label: MEAL_LABELS[cat], items: (c && c.meals && c.meals[cat]) || [] }))
+    .filter((g) => g.items.length);
+}
+
 /**
  * What a saved check-in still leaves open, for the completion sheet. The check-in itself is always "complete" once
  * saved; this only reports personal goals that are unfinished (or done). Only applicable items are returned.

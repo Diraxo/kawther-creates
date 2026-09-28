@@ -104,7 +104,7 @@ const actions = {
   'add-meal': (el) => addMeal(el.dataset.cat),
   'edit-meal': (el) => editMeal(el.dataset.cat, Number(el.dataset.i)),
   'ask-delete-meal': (el) => askDeleteMeal(el, el.dataset.cat, Number(el.dataset.i)),
-  'do-delete-meal': (el) => doDeleteMeal(el.dataset.cat, Number(el.dataset.i)),
+  'do-delete-meal': (el) => doDeleteMeal(el.dataset.cat, Number(el.dataset.i), el),
   'cancel-delete-meal': (el) => renderMeals(el.dataset.cat),
   'confirm-meal': confirmMeal,
   'delete-meal-modal': deleteMealFromModal,

@@ -10,6 +10,7 @@ import { svgIcon } from '../lib/icons.js';
 import { dayStatusClass } from '../domain/metrics.js';
 import { formatLitres } from '../domain/checkin.js';
 import { movementHtml } from '../lib/movementView.js';
+import { mealGroupsHtml } from '../lib/mealView.js';
 
 export function renderJourney() {
   const { user } = state;
@@ -67,10 +68,7 @@ function dayDetailHtml(c, num, dLabel, goal, goalDay) {
   const goalNote = goalDay ? `<div class="daystatus goal">${svgIcon('crown')}${esc(goalDay)}</div>` : '';
   const head = `<h3 class="daytitle" id="j-detail-title" tabindex="-1">Day ${num} check-in</h3><div class="daypill">${esc(dLabel)}</div>${goalNote}`;
   if (!c) return `${head}<div class="empty" style="padding:18px 0;">No check-in logged for this day.</div>`;
-  const mealsAll = Object.values(c.meals || {}).flat();
-  const mealsHtml = mealsAll.length
-    ? mealsAll.map((m) => `<div class="meal-item" style="cursor:default;"><span>${esc(m.name)}</span><span style="color:var(--sub)">${esc(m.time)}</span></div>`).join('')
-    : '<p class="muted">Nothing logged</p>';
+  const mealsHtml = mealGroupsHtml(c);
   return `${head}
     <div class="daystatus">${CHECK_SVG}Checked in</div>
     <div class="detail-grid">

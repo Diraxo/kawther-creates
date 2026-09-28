@@ -7,12 +7,29 @@
 .choice-card.on{border-color:var(--emerald); background:var(--emerald-tint); color:var(--emerald);}
 .choice-card svg{width:22px; height:22px;}
 
-.meal-item{display:flex; align-items:center; justify-content:space-between; background:var(--emerald-tint); border-radius:12px; padding:10px 12px; margin-bottom:6px; font-size:13.5px; opacity:0; animation:cardIn .3s ease forwards;}
-.meal-item.confirm{background:rgba(224,107,103,.14);}
-.meal-info{flex:1; display:flex; justify-content:space-between; cursor:pointer; padding-right:8px;}
-.meal-del{background:none; border:none; color:var(--sub); padding:4px; cursor:pointer; display:flex;}
+/* Meals. A meal is visible as soon as it exists: NO opacity:0 and NO entrance animation here. (It used to be
+   opacity:0 + a one-keyframe "cardIn" whose implicit end frame is the element's own opacity, i.e. it faded to invisible.) */
+.meal-item{display:flex; align-items:center; gap:6px; background:var(--emerald-tint); border-radius:12px; padding:10px 6px 10px 12px; margin-bottom:6px; font-size:13.5px; min-width:0;}
+.meal-item.static{padding-right:12px;}
+.meal-item.confirm{background:rgba(224,107,103,.14); justify-content:space-between; padding-right:10px;}
+.meal-info{flex:1; min-width:0; cursor:pointer;}
+.meal-item.static .meal-info{cursor:default;}
+.meal-main{display:flex; justify-content:space-between; align-items:baseline; gap:10px;}
+.meal-name{min-width:0; font-weight:600; color:var(--ink); overflow-wrap:anywhere;}
+.meal-time{flex:none; font-size:12px; color:var(--sub); white-space:nowrap;}
+.meal-notes{margin-top:3px; font-size:12px; color:var(--sub); overflow-wrap:anywhere;}
+/* var(--sub) on the light emerald tint is 4.3:1; the secondary meal text needs 4.5:1 */
+:root[data-theme="light"] .meal-time,:root[data-theme="light"] .meal-notes{color:#57605B;}
+.meal-del{flex:none; background:none; border:none; color:var(--sub); width:40px; height:40px; margin:-8px 0; cursor:pointer; display:flex; align-items:center; justify-content:center;}
 .meal-del svg{width:15px; height:15px;}
-.mini-btn{border:none; border-radius:8px; padding:5px 10px; font-size:12px; font-weight:700; cursor:pointer; background:var(--danger); color:#fff;}
+.meal-confirm-q{color:var(--danger); font-weight:600;}
+.meal-confirm-btns{display:flex; gap:8px;}
+.meal-empty{color:var(--sub); font-size:12.5px; text-align:center; padding:12px; margin-bottom:6px; border:1px dashed var(--line); border-radius:12px;}
+.meal-dest{font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--emerald); margin-bottom:6px;}
+.meal-group{margin-bottom:10px;}
+.meal-group:last-child{margin-bottom:0;}
+.meal-group h6{margin:0 0 6px; font-size:12.5px; font-weight:600; color:var(--sub);}
+.mini-btn{border:none; border-radius:8px; padding:5px 10px; min-height:36px; font-size:12px; font-weight:700; cursor:pointer; background:var(--danger); color:#fff;}
 .mini-btn.ghost2{background:transparent; color:var(--sub); border:1px solid var(--line);}
 
 .stat-ic{color:var(--emerald); width:18px; height:18px; margin-bottom:8px;}
